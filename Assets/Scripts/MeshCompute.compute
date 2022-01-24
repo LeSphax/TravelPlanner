@@ -1,0 +1,129 @@
+#pragma kernel StitchTiles
+#pragma kernel StitchHeightTiles
+#pragma kernel AssignVertexHeights
+
+
+// Heightmap contains height value in alpha channel, and normals in rgb channels
+RWTexture2D<float4> Map;
+Texture2D<float3> Tile;
+uint offsetX;
+uint offsetY;
+
+[numthreads(8,8,1)]
+void StitchTiles (uint3 id : SV_DispatchThreadID)
+{
+	Map[id.xy + uint2(offsetX, offsetY)] = float4(Tile[id.xy].xyz, 0);
+}
+
+Texture2D<float4> HeightTile;
+[numthreads(8,8,1)]
+void StitchHeightTiles (uint3 id : SV_DispatchThreadID)
+{
+	Map[id.xy + uint2(offsetX, offsetY)] = float4(HeightTile[id.xy].x, 0, 0, 1);
+}
+
+
+RWStructuredBuffer<float3> VertexBuffer;
+RWStructuredBuffer<float3> UVBuffer;
+uint numVertices;
+uint mapWidth;
+uint mapHeight;
+
+float worldRadius;
+float heightMultiplier;
+float seaLevel;
+
+static const float PI = 3.14159;
+
+float remap(float v, float minOld, float maxOld, float minNew, float maxNew) {
+	return saturate(minNew + (v-minOld) * (maxNew - minNew) / (maxOld-minOld));
+}
+
+uint2 wrapCoord(int2 coord) {
+	coord.x = (coord.x + mapWidth) % mapWidth;
+	coord.y = (coord.y + mapHeight) % mapHeight;
+	return coord;
+}
+
+float calculateWorldHeight(float heightT) {
+	float elevation = remap(heightT, seaLevel, 1, 0, 1);
+	return worldRadius + elevation * heightMultiplier;
+}
+
+
+[numthreads(32,1,1)]
+void AssignVertexHeights (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numVertices) { return; }
+
+	float3 p = VertexBuffer[id.x];
+	
+	float latitude_rad = asin(p.y); //
+	float longitude_rad = atan2(p.x, -p.z);
+
+	float latitudeT = latitude_rad / PI + 0.5;
+	float longitudeT = 0.5 + (longitude_rad / PI) / 2;
+
+	float2 uv = float2(longitudeT, latitudeT);
+	
+	int2 coord = int2(uv.x * (mapWidth-1), uv.y * (mapHeight-1));
+	float height = Map[wrapCoord(coord)].r;
+	//height = smoothedHeightSample(uv);
+
+	float worldHeight = calculateWorldHeight(height);
+
+	VertexBuffer[id.x] = p * worldHeight;
+	UVBuffer[id.x] = p;
+}
+
+
+// // Get point on sphere from long/lat (given in radians)
+// float3 latLongToPoint(float latitude, float longitude) {
+
+// 	float y = sin(latitude);
+
+// 	float r = cos(latitude); // radius of 2d circle cut through sphere at 'y'
+// 	float x = sin(longitude) * r;
+// 	float z = -cos(longitude) * r;
+
+// 	return float3(x,y,z);
+// }
+
+// float3 texCoordToPoint(int2 texCoord) {
+// 	texCoord = wrapCoord(texCoord);
+// 	float tx = texCoord.x / (mapWidth-1.0);
+// 	float ty = texCoord.y / (mapHeight-1.0);
+// 	float longitude = (tx - 0.5) * 2 * PI;
+// 	float latitude = (ty - 0.5) * PI;
+
+// 	float2 uv = float2(tx, ty);
+
+// 	float height = HeightMap[texCoord].a;
+// 	//float smoothHeight = smoothedHeightSample(uv);
+// 	return latLongToPoint(latitude, longitude);
+// }
+
+// [numthreads(8,8,1)]
+// void CalculateNormals (uint3 id : SV_DispatchThreadID)
+// {
+// 	float height = HeightMap[id.xy].a;
+// 	float3 pos = texCoordToPoint(id.xy);
+// 	float3 posNorth = texCoordToPoint(id.xy + int2(0, 1));
+// 	float3 posSouth = texCoordToPoint(id.xy + int2(0, -1));
+// 	float3 posWest = texCoordToPoint(id.xy + int2(1, 0));
+// 	float3 posEast = texCoordToPoint(id.xy + int2(-1, 0));
+
+// 	float3 dirWest = normalize(posWest - pos);
+// 	float3 dirEast = normalize(posEast - pos);
+// 	float3 dirNorth = normalize(posNorth - pos);
+// 	float3 dirSouth = normalize(posSouth - pos);
+// 	float3 n1 = normalize(cross(dirNorth, dirWest));
+// 	float3 n2 = normalize(cross(dirSouth, dirEast));
+
+// 	//float3 dirA = normalize(posNorth - posSouth);
+// 	//float3 dirB = normalize(posWest - posEast);
+// 	//float3 normal = normalize(cross(dirA, dirB));
+// 	float3 normal = normalize(n1+n2);
+
+// 	HeightMap[id.xy] = float4(normal, height);
+// }

@@ -1,0 +1,162 @@
+#pragma kernel StitchHeightTiles
+#pragma kernel AssignVertexHeights
+#pragma kernel CalculateNormals
+#pragma kernel GetHeightAtCoord
+
+// Heightmap contains height value in alpha channel, and normals in rgb channels
+RWTexture2D<float4> HeightMap;
+Texture2D<float> HeightTile;
+uint offsetX;
+uint offsetY;
+
+[numthreads(8,8,1)]
+void StitchHeightTiles (uint3 id : SV_DispatchThreadID)
+{
+	HeightMap[id.xy + uint2(offsetX, offsetY)] = float4(0,0,0,HeightTile[id.xy]);
+}
+
+RWStructuredBuffer<float3> VertexBuffer;
+RWStructuredBuffer<float4> UVBuffer;
+uint numVertices;
+uint mapWidth;
+uint mapHeight;
+
+float worldRadius;
+float heightMultiplier;
+float seaLevel;
+
+static const float PI = 3.14159;
+
+// Remap a value from one range to another
+float remap(float v, float minOld, float maxOld, float minNew, float maxNew) {
+	return saturate(minNew + (v-minOld) * (maxNew - minNew) / (maxOld-minOld));
+}
+
+uint2 wrapCoord(int2 coord) {
+	coord.x = (coord.x + mapWidth) % mapWidth;
+	coord.y = (coord.y + mapHeight) % mapHeight;
+	return coord;
+}
+
+float smoothedHeightSample(float2 uv) {
+	int2 coord = int2(uv.x * (mapWidth-1), uv.y * (mapHeight-1));
+	int offset = 3;
+	float h0 = HeightMap[wrapCoord(coord)].a;
+
+	float hN = HeightMap[wrapCoord(coord + int2(0,offset))].a;
+	float hS = HeightMap[wrapCoord(coord + int2(0,-offset))].a;
+	float hW = HeightMap[wrapCoord(coord + int2(-offset,0))].a;
+	float hE = HeightMap[wrapCoord(coord + int2(offset,0))].a;
+
+	float hNE = HeightMap[wrapCoord(coord + int2(offset,offset))].a;
+	float hSW = HeightMap[wrapCoord(coord + int2(-offset,-offset))].a;
+	float hNW = HeightMap[wrapCoord(coord + int2(-offset,offset))].a;
+	float hSE = HeightMap[wrapCoord(coord + int2(offset,-offset))].a;
+	
+
+	return lerp(h0, (hN + hS + hW + hE + hNE + hSW + hNW + hSE) / 8.0, 0.6);
+	//return (h0 + (hN + hS + hW + hE + hNE + hSW + hNW + hSE) / 8.0) / 2.0;
+	//return (h0 + (hN + hS + hW + hE) * 0.25) * 0.5;
+}
+
+float calculateWorldHeight(float heightT) {
+	float elevation = remap(heightT, seaLevel, 1, 0, 1);
+	return worldRadius + elevation * heightMultiplier;
+}
+
+
+
+[numthreads(32,1,1)]
+void AssignVertexHeights (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= numVertices) { return; }
+
+	float3 p = VertexBuffer[id.x];
+	
+	float latitude_rad = asin(p.y); //
+	float longitude_rad = atan2(p.x, -p.z);
+
+	float latitudeT = latitude_rad / PI + 0.5;
+	float longitudeT = 0.5 + (longitude_rad / PI) / 2;
+
+	float2 uv = float2(longitudeT, latitudeT);
+	
+	int2 coord = int2(uv.x * (mapWidth-1), uv.y * (mapHeight-1));
+	float height = HeightMap[wrapCoord(coord)].a;
+	//height = smoothedHeightSample(uv);
+
+	float worldHeight = calculateWorldHeight(height);
+
+
+	VertexBuffer[id.x] = p * worldHeight;
+	UVBuffer[id.x] = float4(p.xyz, 0);
+}
+
+
+// Get point on sphere from long/lat (given in radians)
+float3 latLongToPoint(float latitude, float longitude) {
+
+	float y = sin(latitude);
+
+	float r = cos(latitude); // radius of 2d circle cut through sphere at 'y'
+	float x = sin(longitude) * r;
+	float z = -cos(longitude) * r;
+
+	return float3(x,y,z);
+}
+
+float3 texCoordToPoint(int2 texCoord) {
+	texCoord = wrapCoord(texCoord);
+	float tx = texCoord.x / (mapWidth-1.0);
+	float ty = texCoord.y / (mapHeight-1.0);
+	float longitude = (tx - 0.5) * 2 * PI;
+	float latitude = (ty - 0.5) * PI;
+
+	float2 uv = float2(tx, ty);
+
+	float height = HeightMap[texCoord].a;
+	//float smoothHeight = smoothedHeightSample(uv);
+	float worldHeight = calculateWorldHeight(height);
+	return latLongToPoint(latitude, longitude) * worldHeight;
+}
+
+[numthreads(8,8,1)]
+void CalculateNormals (uint3 id : SV_DispatchThreadID)
+{
+	float height = HeightMap[id.xy].a;
+	float3 pos = texCoordToPoint(id.xy);
+	float3 posNorth = texCoordToPoint(id.xy + int2(0, 1));
+	float3 posSouth = texCoordToPoint(id.xy + int2(0, -1));
+	float3 posWest = texCoordToPoint(id.xy + int2(1, 0));
+	float3 posEast = texCoordToPoint(id.xy + int2(-1, 0));
+
+	float3 dirWest = normalize(posWest - pos);
+	float3 dirEast = normalize(posEast - pos);
+	float3 dirNorth = normalize(posNorth - pos);
+	float3 dirSouth = normalize(posSouth - pos);
+	float3 n1 = normalize(cross(dirNorth, dirWest));
+	float3 n2 = normalize(cross(dirSouth, dirEast));
+
+	//float3 dirA = normalize(posNorth - posSouth);
+	//float3 dirB = normalize(posWest - posEast);
+	//float3 normal = normalize(cross(dirA, dirB));
+	float3 normal = normalize(n1+n2);
+
+	HeightMap[id.xy] = float4(normal, height);
+}
+
+Texture2D<float2> CountryData;
+RWStructuredBuffer<float3> HeightRequestBuffer;
+float2 heightRequestCoord;
+
+[numthreads(1,1,1)]
+void GetHeightAtCoord (uint3 id : SV_DispatchThreadID)
+{
+
+	float2 uv = float2(remap(heightRequestCoord.x, -PI, PI, 0, 1), remap(heightRequestCoord.y, -PI/2, PI/2, 0, 1));
+	int2 coord = wrapCoord(int2(uv.x * (mapWidth-1), uv.y * (mapHeight-1)));
+	float rawHeightVal = HeightMap[coord].a;
+	int isOcean = rawHeightVal <= seaLevel;
+	float countryIndex = CountryData[coord].g - 1;//
+	HeightRequestBuffer[0] = float3(calculateWorldHeight(rawHeightVal), isOcean, countryIndex);
+}

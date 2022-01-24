@@ -1,0 +1,162 @@
+#pragma kernel DrawOutlines
+#pragma kernel FillCountries
+#pragma kernel UpdateCountryDisplay
+
+struct PolygonMetaData
+{
+	int countryIndex;
+	float2 boundsMin;
+	float2 boundsMax;
+	int bufferOffset;
+	int length;
+};
+
+
+RWTexture2D<float2> CountryData;
+StructuredBuffer<PolygonMetaData> Meta;
+StructuredBuffer<float2> Points;
+
+uint width;
+uint height;
+int numPoints;
+int numMeta;
+
+float lineThickness;
+float lineSmoothingSize;
+
+// Sqr distance from point P to line segment AB
+// Assumes A and B are not in same position
+float sqrDistanceToLineSegment(float2 p, float2 a, float2 b)
+{
+	float2 aB = b - a;
+	float2 aP = p - a;
+	float sqrLenAB = dot(aB, aB);
+	float t = saturate(dot(aP, aB) / sqrLenAB);
+	float2 offsetToNearestPointOnLine = p - (a + aB * t);
+	return dot(offsetToNearestPointOnLine, offsetToNearestPointOnLine);
+}
+
+
+[numthreads(8,8,1)]
+void DrawOutlines (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= width || id.y >= height) { return; }
+
+	float2 uv = float2(id.x / (width-1.0), id.y / (height-1.0));
+	float2 p = float2((uv.x - 0.5) * 360, (uv.y - 0.5) * 180);
+
+	float sqrLineThickness = lineThickness * lineThickness;
+	float minSqrDst = sqrLineThickness;
+
+	for (int i = 0; i < numMeta; i ++) {
+		PolygonMetaData meta = Meta[i];
+
+		// Inside country bounds
+		if (p.x > meta.boundsMin.x && p.x < meta.boundsMax.x && p.y > meta.boundsMin.y && p.y < meta.boundsMax.y) {
+		
+			for (int j = 0; j < meta.length-1; j ++) {
+				float2 a = Points[j + meta.bufferOffset];
+				float2 b = Points[j + 1 + meta.bufferOffset];
+				
+				float sqrDstToLine = sqrDistanceToLineSegment(p, a, b);
+				minSqrDst = min(minSqrDst, sqrDstToLine);
+			}
+		}
+	}
+
+	float lineStrength = 1-smoothstep(lineThickness-lineSmoothingSize, lineThickness, sqrt(minSqrDst));
+
+	CountryData[id.xy] = float2(lineStrength, 0);
+}
+
+
+bool isLeft(float2 a, float2 b, float2 p) {
+	return (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y) > 0;
+}
+
+// Thanks to Dan Sunday
+bool pointInPolygon(float2 p, int polygonStartIndex, int numPointsInPolygon) {
+	int windingNumber = 0;
+	for (int i = polygonStartIndex; i < polygonStartIndex + numPointsInPolygon - 1; i ++) {
+		
+		float2 a = Points[i];
+		float2 b = Points[i + 1];
+
+		if (a.y <= p.y) {
+			if (b.y > p.y && isLeft(a, b, p)) {
+				windingNumber ++;
+			}
+		}
+		else if (b.y <= p.y && !isLeft(a, b, p)) {
+			windingNumber --;
+		}
+	}
+
+	return windingNumber != 0;
+}
+
+[numthreads(8,8,1)]
+void FillCountries (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= width || id.y >= height) { return; } 
+
+	float2 uv = float2(id.x / (width-1.0), id.y / (height-1.0));
+	float2 p = float2((uv.x - 0.5) * 360, (uv.y - 0.5) * 180);
+
+	for (int i = 0; i < numMeta; i ++) {
+		PolygonMetaData meta = Meta[i];
+
+		// Inside country bounds
+		if (p.x > meta.boundsMin.x && p.x < meta.boundsMax.x && p.y > meta.boundsMin.y && p.y < meta.boundsMax.y) {
+			if (pointInPolygon(p, meta.bufferOffset, meta.length)) {
+				CountryData[id.xy] = float2(CountryData[id.xy].x, meta.countryIndex + 1);
+				return;
+			}
+		}
+	}
+}
+
+ // Contains value for each country between 0 and 1
+ // 0 means country is not displayed, 1 means it's fully displayed
+RWStructuredBuffer<float> CountryDisplayStrength;
+int numCountries;
+float2 playerLongitudeLatitude;
+float deltaTime;
+static const int radius = 25;
+
+[numthreads(1,1,1)]
+void UpdateCountryDisplay (uint3 id : SV_DispatchThreadID)
+{
+	static const float PI = 3.141592;
+	static const float TAU = 2 * PI;
+	float displayStrength = CountryDisplayStrength[id.x];
+
+	float tx = (playerLongitudeLatitude.x + PI) / TAU;
+	float ty = (playerLongitudeLatitude.y + PI/2) / PI;
+	bool isVisitingCountry = false;
+	uint2 playerTexCoord = uint2(tx * (width-1), ty * (height-1));
+
+	for (int offsetY = -radius; offsetY <= radius; offsetY ++) {
+		for (int offsetX = -radius; offsetX <= radius; offsetX ++) {
+			if (offsetX * offsetX + offsetY * offsetY <= radius * radius) {
+				int2 texCoord = int2((playerTexCoord.x + offsetX + width) % width, (playerTexCoord.y + offsetY + height) % height);
+				int countryIndex = CountryData[texCoord].y - 1;
+
+				if (countryIndex == (int)id.x) {
+					isVisitingCountry = true;
+					displayStrength += deltaTime;
+					// Exit both loops
+					offsetY = radius + 1;
+					break;
+				}
+			}
+		}
+	}
+
+	if (!isVisitingCountry) {
+		displayStrength -= deltaTime;
+	}
+	CountryDisplayStrength[id.x] = saturate(displayStrength);
+
+
+}
