@@ -9,6 +9,7 @@ public class Zoom : MonoBehaviour
     public float rotationSpeed = 100;
     private Vector3 previousRightPosition;
     private Vector3 previousLeftPosition; 
+    private Vector3 previousMousePosition; 
     // Start is called before the first frame update
     void Start()
     {
@@ -16,8 +17,8 @@ public class Zoom : MonoBehaviour
     }
 
     void rotateEarth(Vector3 position, Vector3 previousPosition) {
-         Vector3 delta = position - previousPosition;
-        Debug.Log(position.ToString("F4") + "   " + previousPosition.ToString("F4") + "    "  + delta.ToString("F4"));
+        Vector3 delta = position - previousPosition;
+        // Debug.Log(position.ToString("F4") + "   " + previousPosition.ToString("F4") + "    "  + delta.ToString("F4"));
         earthTransform.RotateAround(earthTransform.position, Vector3.up, -delta.x * rotationSpeed / earthTransform.localScale.x);
         earthTransform.RotateAround(earthTransform.position, Vector3.right, delta.y * rotationSpeed / earthTransform.localScale.x);
     }
@@ -29,6 +30,8 @@ public class Zoom : MonoBehaviour
         bool rightPressed = Input.GetAxis("Oculus_CrossPlatform_SecondaryIndexTrigger") > 0.8;
         Vector3 leftPosition = OVRInput.GetLocalControllerPosition(OVRInput.Controller.LTouch);
         Vector3 rightPosition = OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch);
+
+        Vector3 mousePosition = Input.mousePosition / 1000;
 
         if (leftPressed && rightPressed) {
             Debug.Log(OVRInput.GetLocalControllerPosition(OVRInput.Controller.RTouch));
@@ -51,10 +54,13 @@ public class Zoom : MonoBehaviour
             rotateEarth(rightPosition, previousRightPosition);
         } else if (Input.mouseScrollDelta.y != 0) {
             earthTransform.localScale = earthTransform.localScale * (1 + Input.mouseScrollDelta.y * 0.1f);
-        }
+        } else if (Input.GetMouseButton(1)) {
+            rotateEarth(mousePosition, previousMousePosition);
+        } 
         
         earthTransform.position = this.GetComponent<Transform>().position + new Vector3(0, 0, (earthTransform.localScale.z) + 5);
         previousLeftPosition = leftPosition;
         previousRightPosition = rightPosition;
+        previousMousePosition = mousePosition;
     }
 }

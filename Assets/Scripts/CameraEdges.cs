@@ -1,6 +1,4 @@
 using UnityEngine;
-using System.Collections.Generic;
-using System.Linq;
 
 public class CameraEdges : MonoBehaviour
 {
@@ -11,7 +9,7 @@ public class CameraEdges : MonoBehaviour
   public float minLongitude = -Mathf.Infinity;
   public float maxLongitude = Mathf.Infinity;
 
-  Vector3? getIntersection(Vector3 o, Vector3 d, float r)
+  Vector3? getIntersection(Vector3 o, Vector3 d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false)
   {
     // Debug.Log(o);
     // Debug.Log(d);
@@ -34,38 +32,72 @@ public class CameraEdges : MonoBehaviour
     float T2 = (-b + deltaRoot) / 2 * a;
 
     Vector3 intersection = o + T * d;
-    Vector3 intersection2 = o + T2 * d;
-    Debug.DrawLine(globeTransform.position, globeTransform.position + intersection, Color.green, 0.1f);
-    Debug.DrawLine(globeTransform.position, globeTransform.position + intersection2, Color.yellow, 0.1f);
-    Vector3 normalizedIntersection = intersection.normalized;
-    // float longitude_rad = Mathf.Atan2(normalizedIntersection.x, -normalizedIntersection.z);
-    // float latitude_rad = -Mathf.Asin(normalizedIntersection.y);
-    return intersection;
+    Vector3 normalizedIntersection = Quaternion.Inverse(globeTransform.localRotation) * intersection.normalized;
+    Debug.DrawLine(globeTransform.position, globeTransform.position + intersection, color, 0.1f);
+    Debug.DrawLine(globeTransform.position, globeTransform.position + normalizedIntersection * 10, color, 0.1f);
+    float longitude_rad = Mathf.Atan2(normalizedIntersection.x, -normalizedIntersection.z);
+    float latitude_rad = Mathf.Asin(normalizedIntersection.y);
+    if (log)
+      Debug.Log(latitude_rad + "  " + normalizedIntersection + "   " + intersection);
+    return new Vector2(longitude_rad, latitude_rad);
   }
 
   void getLimits()
   {
-    Ray topLeft = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0, 0));
-    Ray topRight = Camera.main.ViewportPointToRay(new Vector3(1, 0.5f, 0));
-    Ray botRight = Camera.main.ViewportPointToRay(new Vector3(0.5f, 1, 0));
-    Ray botLeft = Camera.main.ViewportPointToRay(new Vector3(0, 0.5f, 0));
-    Debug.DrawRay(topLeft.origin, 10 * topLeft.direction, Color.red, 0.1f);
-    Debug.DrawRay(topRight.origin, 10 * topRight.direction, Color.red, 0.1f);
-    Debug.DrawRay(botRight.origin, 10 * botRight.direction, Color.red, 0.1f);
-    Debug.DrawRay(botLeft.origin, 10 * botLeft.direction, Color.red, 0.1f);
+    Ray topLeft = Camera.main.ViewportPointToRay(new Vector3(0, 1, 0));
+    Ray topRight = Camera.main.ViewportPointToRay(new Vector3(1, 1, 0));
+    Ray botRight = Camera.main.ViewportPointToRay(new Vector3(1, 0, 0));
+    Ray botLeft = Camera.main.ViewportPointToRay(new Vector3(0, 0, 0));
+    Debug.DrawRay(topLeft.origin, 20 * topLeft.direction, Color.red, 0.1f);
+    Debug.DrawRay(topRight.origin, 20 * topRight.direction, Color.red, 0.1f);
+    Debug.DrawRay(botRight.origin, 20 * botRight.direction, Color.red, 0.1f);
+    Debug.DrawRay(botLeft.origin, 20 * botLeft.direction, Color.red, 0.1f);
 
     float radius = globeTransform.localScale.x;
 
-    Vector2? topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius);
-    Vector2? topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius);
-    Vector2? botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius);
-    Vector2? botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius);
+    // Vector2? topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius);
+    // Vector2? topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius);
+    // Vector2? botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius);
+    // Vector2? botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius);
 
-    minLatitude = botRightIntersection.HasValue ? 1.5f * botRightIntersection.Value.y : -Mathf.Infinity;
-    maxLatitude = topLeftIntersection.HasValue ? 1.5f * topLeftIntersection.Value.y : Mathf.Infinity;
-    minLongitude = botLeftIntersection.HasValue ? 1.5f * botLeftIntersection.Value.x : -Mathf.Infinity;
-    maxLongitude = topRightIntersection.HasValue ? 1.5f * topRightIntersection.Value.x : Mathf.Infinity;
+    // minLatitude = botRightIntersection.HasValue ? 1.5f * botRightIntersection.Value.y : -Mathf.Infinity;
+    // maxLatitude = topLeftIntersection.HasValue ? 1.5f * topLeftIntersection.Value.y : Mathf.Infinity;
+    // minLongitude = botLeftIntersection.HasValue ? 1.5f * botLeftIntersection.Value.x : -Mathf.Infinity;
+    // maxLongitude = topRightIntersection.HasValue ? 1.5f * topRightIntersection.Value.x : Mathf.Infinity;
 
+
+    Vector2? topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.green);
+    Vector2? topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius, globeTransform.worldToLocalMatrix, Color.yellow);
+    Vector2? botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius, globeTransform.worldToLocalMatrix, Color.blue, true);
+    Vector2? botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.cyan);
+
+    minLatitude = Mathf.Min(
+      topLeftIntersection.HasValue ? topLeftIntersection.Value.y : -Mathf.Infinity,
+      topRightIntersection.HasValue ? topRightIntersection.Value.y : -Mathf.Infinity,
+      botRightIntersection.HasValue ? botRightIntersection.Value.y : -Mathf.Infinity,
+      botLeftIntersection.HasValue ? botLeftIntersection.Value.y : -Mathf.Infinity
+    );
+
+    maxLatitude = Mathf.Max(
+      topLeftIntersection.HasValue ? topLeftIntersection.Value.y : Mathf.Infinity,
+      topRightIntersection.HasValue ? topRightIntersection.Value.y : Mathf.Infinity,
+      botRightIntersection.HasValue ? botRightIntersection.Value.y : Mathf.Infinity,
+      botLeftIntersection.HasValue ? botLeftIntersection.Value.y : Mathf.Infinity
+    );
+
+    minLongitude = Mathf.Min(
+      topLeftIntersection.HasValue ? topLeftIntersection.Value.x : -Mathf.Infinity,
+      topRightIntersection.HasValue ? topRightIntersection.Value.x : -Mathf.Infinity,
+      botRightIntersection.HasValue ? botRightIntersection.Value.x : -Mathf.Infinity,
+      botLeftIntersection.HasValue ? botLeftIntersection.Value.x : -Mathf.Infinity
+    );
+
+    maxLongitude = Mathf.Max(
+      topLeftIntersection.HasValue ? topLeftIntersection.Value.x : Mathf.Infinity,
+      topRightIntersection.HasValue ? topRightIntersection.Value.x : Mathf.Infinity,
+      botRightIntersection.HasValue ? botRightIntersection.Value.x : Mathf.Infinity,
+      botLeftIntersection.HasValue ? botLeftIntersection.Value.x : Mathf.Infinity
+    );
   }
 
   void Start()

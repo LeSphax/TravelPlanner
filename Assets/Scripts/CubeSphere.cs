@@ -3,105 +3,180 @@ using UnityEngine;
 public static class CubeSphere
 {
 
-	public static MeshData[] GenerateMeshes(int resolution, int numSubdivisions, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)
-	{
-		MeshData[] meshes = new MeshData[6 * numSubdivisions * numSubdivisions];
-		Vector3[] faceNormals = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
-		float faceCoveragePerSubFace = 1f / numSubdivisions;
-		int meshIndex = 0;
+  public static MeshData[] GenerateMeshes(int resolution, int numSubdivisions, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)
+  {
+    MeshData[] meshes = new MeshData[6 * numSubdivisions * numSubdivisions];
+    Vector3[] faceNormals = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
+    float faceCoveragePerSubFace = 1f / numSubdivisions;
+    int meshIndex = 0;
 
-		foreach (Vector3 faceNormal in faceNormals)
-		{
-			for (int y = 0; y < numSubdivisions; y++)
-			{
-				for (int x = 0; x < numSubdivisions; x++)
-				{
-					Vector2 startT = new Vector2(x, y) * faceCoveragePerSubFace;
-					Vector2 endT = startT + Vector2.one * faceCoveragePerSubFace;
+    Vector2[] viewportCorners = { new Vector2(minLongitude, minLatitude), new Vector2(minLongitude, maxLatitude), new Vector2(maxLongitude, minLatitude), new Vector2(maxLongitude, maxLatitude) };
 
-					meshes[meshIndex] = CreateFace(resolution, faceNormal, startT, endT, minLatitude, maxLatitude, minLongitude, maxLongitude);
-					meshIndex++;
-				}
-			}
-		}
+    foreach (Vector3 faceNormal in faceNormals)
+    {
+      for (int y = 0; y < numSubdivisions; y++)
+      {
+        for (int x = 0; x < numSubdivisions; x++)
+        {
+          Vector2 startT = new Vector2(x, y) * faceCoveragePerSubFace;
+          Vector2 endT = startT + Vector2.one * faceCoveragePerSubFace;
 
-		return meshes;
-	}
+          Vector3 axisA = new Vector3(faceNormal.y, faceNormal.z, faceNormal.x);
+          Vector3 axisB = Vector3.Cross(faceNormal, axisA);
 
-	static MeshData CreateFace(int resolution, Vector3 normal, Vector2 startT, Vector2 endT, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)
-	{
-		int numVerts = resolution * resolution;
-		int numTris = (resolution - 1) * (resolution - 1) * 6;
-		int triIndex = 0;
+          Vector3[] corners = { faceNormal + axisA, faceNormal - axisA, faceNormal - axisB, faceNormal + axisB, faceNormal + axisA + axisB, faceNormal - axisA + axisB, faceNormal + axisA - axisB, faceNormal - axisA - axisB };
+          Vector2[] cornerCoordinates = new Vector2[8];
+          for (int i = 0; i < corners.Length; i++)
+          {
+            corners[i] = PointOnCubeToPointOnSphere(corners[i]);
+            float longitude_rad = Mathf.Atan2(corners[i].x, -corners[i].z);
+            float latitude_rad = Mathf.Asin(corners[i].y);
+            cornerCoordinates[i] = new Vector2(longitude_rad, latitude_rad);
+          }
 
-		MeshData meshData = new MeshData(numVerts, numTris);
+          bool hasOneVisibleCorner = false;
+          float minX = Mathf.Infinity;
+          float minY = Mathf.Infinity;
+          float maxX = -Mathf.Infinity;
+          float maxY = -Mathf.Infinity;
+          foreach (Vector3 coord in cornerCoordinates)
+          {
 
-		Vector3 axisA = new Vector3(normal.y, normal.z, normal.x);
-		Vector3 axisB = Vector3.Cross(normal, axisA);
+            // Debug.Log(faceNormal + "    " + coord);
+            if (coord.x >= minLongitude && coord.x <= maxLongitude && coord.y >= minLatitude && coord.y <= maxLatitude)
+            {
+              hasOneVisibleCorner = true;
+            }
+            if (minX > coord.x) minX = coord.x;
+            if (minY > coord.y) minY = coord.y;
+            if (maxX < coord.x) maxX = coord.x;
+            if (maxY < coord.y) maxY = coord.y;
+          }
+
+          if (faceNormal.y > 0.99f || faceNormal.y < -0.99f)
+          {
+            if (faceNormal.y > 0.99f)
+            {
+              maxY = Mathf.Infinity;
+            }
+            if (faceNormal.y < -0.99f)
+            {
+              minY = -Mathf.Infinity;
+            }
+            minX = -Mathf.Infinity;
+            maxX = Mathf.Infinity;
+          }
+
+          bool viewportHasOneCornerInside = false;
+          foreach (Vector2 coord in viewportCorners)
+          {
+            if (coord.x >= minX && coord.x <= maxX && coord.y >= minY && coord.y <= maxY)
+            {
+              viewportHasOneCornerInside = true;
+            }
+          }
+
+          // Debug.Log("Center bottom " + faceNormal + "   " + (faceNormal + axisB) + "  " + Mathf.Asin((faceNormal + axisB).y));
+          // Debug.Log("Middle left " + faceNormal + "   " + (faceNormal + axisA) + "  " + Mathf.Asin((faceNormal + axisA).y));
+
+          Debug.Log(faceNormal + "    " + hasOneVisibleCorner + "  " + viewportHasOneCornerInside + "  " + minX + "   " + minY + "   " + maxX + "   " + maxY);
+          if (hasOneVisibleCorner || viewportHasOneCornerInside)
+          {
+            meshes[meshIndex] = CreateFace(resolution, faceNormal, startT, endT, minLatitude, maxLatitude, minLongitude, maxLongitude);
+          }
+          else
+          {
+            meshes[meshIndex] = new MeshData(0, 0);
+          }
+          meshIndex++;
+        }
+      }
+    }
+
+    return meshes;
+  }
+
+  static MeshData CreateFace(int resolution, Vector3 normal, Vector2 startT, Vector2 endT, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)
+  {
+    // Debug.Log("Create Face  " + normal);
+    int numVerts = resolution * resolution;
+    int numTris = (resolution - 1) * (resolution - 1) * 6;
+    int triIndex = 0;
+
+    MeshData meshData = new MeshData(numVerts, numTris);
+
+    Vector3 axisA = new Vector3(normal.y, normal.z, normal.x);
+    Vector3 axisB = Vector3.Cross(normal, axisA);
 
 
-		float ty = startT.y;
-		float dx = (endT.x - startT.x) / (resolution - 1);
-		float dy = (endT.y - startT.y) / (resolution - 1);
+    float ty = startT.y;
+    float dx = (endT.x - startT.x) / (resolution - 1);
+    float dy = (endT.y - startT.y) / (resolution - 1);
 
-		for (int y = 0; y < resolution; y++)
-		{
-			float tx = startT.x;
+    for (int y = 0; y < resolution; y++)
+    {
+      float tx = startT.x;
 
-			for (int x = 0; x < resolution; x++)
-			{
-				int i = x + y * resolution;
-				Vector3 pointOnUnitCube = normal + (tx - 0.5f) * 2 * axisA + (ty - 0.5f) * 2 * axisB;
-				Vector3 pointOnUnitSphere = PointOnCubeToPointOnSphere(pointOnUnitCube);
+      for (int x = 0; x < resolution; x++)
+      {
+        int i = x + y * resolution;
+        Vector3 pointOnUnitCube = normal + (tx - 0.5f) * 2 * axisA + (ty - 0.5f) * 2 * axisB;
+        Vector3 pointOnUnitSphere = PointOnCubeToPointOnSphere(pointOnUnitCube);
 
-				float longitude_rad = Mathf.Atan2(pointOnUnitSphere.x, -pointOnUnitSphere.z);
-				float latitude_rad = Mathf.Asin(pointOnUnitSphere.y);
+        // float longitude_rad = Mathf.Atan2(pointOnUnitSphere.x, -pointOnUnitSphere.z);
+        // float latitude_rad = Mathf.Asin(pointOnUnitSphere.y);
 
-				if (latitude_rad < maxLatitude && latitude_rad > minLatitude && longitude_rad < maxLongitude && longitude_rad > minLongitude) {
+        // if (pointOnUnitSphere.y < maxLatitude && pointOnUnitSphere.y > minLatitude && pointOnUnitSphere.x < maxLongitude && pointOnUnitSphere.x > minLongitude)
+        // {
 
-					meshData.vertices[i] = pointOnUnitSphere;
+        meshData.vertices[i] = pointOnUnitSphere;
 
-					if (x != resolution - 1 && y != resolution - 1)
-					{
-						meshData.triangles[triIndex] = i;
-						meshData.triangles[triIndex + 1] = i + resolution + 1;
-						meshData.triangles[triIndex + 2] = i + resolution;
+        if (x != resolution - 1 && y != resolution - 1)
+        {
+          meshData.triangles[triIndex] = i;
+          meshData.triangles[triIndex + 1] = i + resolution + 1;
+          meshData.triangles[triIndex + 2] = i + resolution;
 
-						meshData.triangles[triIndex + 3] = i;
-						meshData.triangles[triIndex + 4] = i + 1;
-						meshData.triangles[triIndex + 5] = i + resolution + 1;
-						triIndex += 6;
-					}
-				}
-				tx += dx;
-			}
-			ty += dy;
-		}
-		return meshData;
-	}
+          meshData.triangles[triIndex + 3] = i;
+          meshData.triangles[triIndex + 4] = i + 1;
+          meshData.triangles[triIndex + 5] = i + resolution + 1;
+          triIndex += 6;
+        }
+        // }
+        tx += dx;
+      }
+      ty += dy;
+    }
+    return meshData;
+  }
 
-	// From http://mathproofs.blogspot.com/2005/07/mapping-cube-to-sphere.html
-	static Vector3 PointOnCubeToPointOnSphere(Vector3 p)
-	{
-		float x2 = p.x * p.x / 2;
-		float y2 = p.y * p.y / 2;
-		float z2 = p.z * p.z / 2;
-		float x = p.x * Mathf.Sqrt(1 - y2 - z2 + (p.y * p.y * p.z * p.z) / 3);
-		float y = p.y * Mathf.Sqrt(1 - z2 - x2 + (p.x * p.x * p.z * p.z) / 3);
-		float z = p.z * Mathf.Sqrt(1 - x2 - y2 + (p.x * p.x * p.y * p.y) / 3);
-		return new Vector3(x, y, z);
+  // From http://mathproofs.blogspot.com/2005/07/mapping-cube-to-sphere.html
+  static Vector3 PointOnCubeToPointOnSphere(Vector3 p)
+  {
+    float x2 = p.x * p.x / 2;
+    float y2 = p.y * p.y / 2;
+    float z2 = p.z * p.z / 2;
+    float x = p.x * Mathf.Sqrt(1 - y2 - z2 + (p.y * p.y * p.z * p.z) / 3);
+    float y = p.y * Mathf.Sqrt(1 - z2 - x2 + (p.x * p.x * p.z * p.z) / 3);
+    float z = p.z * Mathf.Sqrt(1 - x2 - y2 + (p.x * p.x * p.y * p.y) / 3);
+    return new Vector3(x, y, z);
 
-	}
+  }
 
-	public struct MeshData
-	{
-		public readonly Vector3[] vertices;
-		public readonly int[] triangles;
+  public struct MeshData
+  {
+    public readonly Vector3[] vertices;
+    public readonly int[] triangles;
 
-		public MeshData(int numVerts, int numTris)
-		{
-			vertices = new Vector3[numVerts];
-			triangles = new int[numTris];
-		}
-	}
+    public MeshData(int numVerts, int numTris)
+    {
+      vertices = new Vector3[numVerts];
+      triangles = new int[numTris];
+    }
+
+    public override string ToString()
+    {
+      return string.Format("MeshData: {0} vertices, {1} triangles", vertices.Length, triangles.Length);
+    }
+  }
 }
