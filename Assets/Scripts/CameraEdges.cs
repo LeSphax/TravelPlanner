@@ -39,7 +39,8 @@ public class CameraEdges : MonoBehaviour
     Vector3 intersection = o + T * d;
     Vector3 normalizedIntersection = Quaternion.Inverse(globeTransform.localRotation) * intersection.normalized;
     Debug.DrawLine(globeTransform.position, globeTransform.position + intersection, color, 0.1f);
-    Debug.DrawLine(globeTransform.position, globeTransform.position + normalizedIntersection * 10, color, 0.1f);
+    Debug.DrawLine(o, globeTransform.position + intersection, color, 0.1f);
+    // Debug.DrawLine(globeTransform.position, globeTransform.position + normalizedIntersection * 10, color, 0.1f);
     float longitude_rad = Mathf.Atan2(normalizedIntersection.x, -normalizedIntersection.z);
     float latitude_rad = Mathf.Asin(normalizedIntersection.y);
     if (log)
@@ -53,11 +54,6 @@ public class CameraEdges : MonoBehaviour
     Ray topRight = Camera.main.ViewportPointToRay(new Vector3(1, 1, 0));
     Ray botRight = Camera.main.ViewportPointToRay(new Vector3(1, 0, 0));
     Ray botLeft = Camera.main.ViewportPointToRay(new Vector3(0, 0, 0));
-    Debug.DrawRay(topLeft.origin, 20 * topLeft.direction, Color.red, 0.1f);
-    Debug.DrawRay(topRight.origin, 20 * topRight.direction, Color.red, 0.1f);
-    Debug.DrawRay(botRight.origin, 20 * botRight.direction, Color.red, 0.1f);
-    Debug.DrawRay(botLeft.origin, 20 * botLeft.direction, Color.red, 0.1f);
-
     float radius = globeTransform.localScale.x;
 
 

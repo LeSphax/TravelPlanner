@@ -602,7 +602,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   resolution: 10
-  numSubdivisions: 5
+  numSubdivisions: 2
   worldRadius: 1
   heightMultiplier: 0
   textureResolution: 3

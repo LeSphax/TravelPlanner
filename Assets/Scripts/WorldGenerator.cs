@@ -166,7 +166,7 @@ public class WorldGenerator : MonoBehaviour
       Destroy(mesh);
     }
     frameMeshes = new List<Mesh>();
-    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions);
+    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions, transform);
     for (int i = 0; i < allMeshData.Count; i++)
     {
       // Debug.Log(i + "  " + allMeshData.Count);
