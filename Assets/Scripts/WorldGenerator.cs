@@ -34,7 +34,7 @@ public class WorldGenerator : MonoBehaviour
   public RenderTexture heightMap;
   private CameraEdges cameraEdges;
   public Texture2D tex;
-  MeshFilter[] meshFilters = new MeshFilter[6];
+  MeshFilter[] meshFilters;
   private int NUMBER_OF_TILES = 32;
 
   private void Awake()
@@ -66,7 +66,8 @@ public class WorldGenerator : MonoBehaviour
     Stitch(heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
 
 
-    for (int i = 0; i < 6; i++)
+    meshFilters = new MeshFilter[6 * (int)Mathf.Pow(4, numSubdivisions)];
+    for (int i = 0; i < 6 * Mathf.Pow(4, numSubdivisions); i++)
     {
       GameObject meshHolder = new GameObject("Cube Sphere Mesh" + i);
       meshHolder.transform.SetParent(transform, false);
@@ -165,9 +166,10 @@ public class WorldGenerator : MonoBehaviour
       Destroy(mesh);
     }
     frameMeshes = new List<Mesh>();
-    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions, cameraEdges.minLatitude, cameraEdges.maxLatitude, cameraEdges.minLongitude, cameraEdges.maxLongitude);
-    for (int i = 0; i < allMeshData.Length; i++)
+    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions);
+    for (int i = 0; i < allMeshData.Count; i++)
     {
+      // Debug.Log(i + "  " + allMeshData.Count);
       frameMeshes.Add(Create(allMeshData[i].vertices, allMeshData[i].triangles, i));
     }
     material.SetTexture("_MainTex", albedoMap);

@@ -1,99 +1,161 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public static class CubeSphere
 {
 
-  public static MeshData[] GenerateMeshes(int resolution, int numSubdivisions, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)
+  public static List<MeshData> GenerateMeshes(int resolution, int numSubdivisions)
   {
-    MeshData[] meshes = new MeshData[6 * numSubdivisions * numSubdivisions];
+    List<MeshData> meshes = new List<MeshData>();
     Vector3[] faceNormals = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
     float faceCoveragePerSubFace = 1f / numSubdivisions;
     int meshIndex = 0;
 
-    Vector2[] viewportCorners = { new Vector2(minLongitude, minLatitude), new Vector2(minLongitude, maxLatitude), new Vector2(maxLongitude, minLatitude), new Vector2(maxLongitude, maxLatitude) };
+    Vector3?[] viewportCorners = { CameraEdges.topLeftIntersection, CameraEdges.botLeftIntersection, CameraEdges.botRightIntersection, CameraEdges.topRightIntersection };
+    Vector3? viewportCenter = CameraEdges.topLeftIntersection.HasValue && CameraEdges.botRightIntersection.HasValue ? CameraEdges.topLeftIntersection.Value + (CameraEdges.botRightIntersection - CameraEdges.topLeftIntersection) / 2 : null;
 
     foreach (Vector3 faceNormal in faceNormals)
     {
-      for (int y = 0; y < numSubdivisions; y++)
+      Vector3 axisA = new Vector3(faceNormal.y, faceNormal.z, faceNormal.x);
+      Vector3 axisB = Vector3.Cross(faceNormal, axisA);
+      meshes.AddRange(CreateFaces(resolution, faceNormal, axisA, axisB, numSubdivisions, viewportCorners, viewportCenter));
+      meshIndex++;
+    }
+
+    return meshes;
+  }
+
+  static bool shouldRender(Vector3 normal, Vector3 axisA, Vector3 axisB, Vector3?[] viewportCorners, Vector3? viewportCenter)
+  {
+    Vector3[] corners = { normal + axisA + axisB, normal - axisA + axisB, normal + axisA - axisB, normal - axisA - axisB };
+    // Dot product of normalized vectors is higher when they are more aligned.
+    // If a position is more aligned than the corner of the face then it's inside.
+    // I.E Its dot product is higher than the dot product of the corner.
+    float threshold = Vector3.Dot(normal, corners[0].normalized) / 1.02f;
+    bool viewportHasOneCornerInside = false;
+    foreach (Vector3? coord in viewportCorners)
+    {
+      if (!coord.HasValue)
       {
-        for (int x = 0; x < numSubdivisions; x++)
+        viewportHasOneCornerInside = true;
+        break;
+      }
+      else
+      {
+        // if (normal.x > 0)
+        //   Debug.Log("IsCorner in viewport " + normal + "   " + coord.Value + "   " + Vector3.Dot(normal, coord.Value.normalized) + " T " + corners[0].normalized + "   " + threshold);
+        bool isCornerInside = Vector3.Dot(normal, coord.Value.normalized) > threshold;
+        if (isCornerInside)
         {
-          Vector2 startT = new Vector2(x, y) * faceCoveragePerSubFace;
-          Vector2 endT = startT + Vector2.one * faceCoveragePerSubFace;
-
-          Vector3 axisA = new Vector3(faceNormal.y, faceNormal.z, faceNormal.x);
-          Vector3 axisB = Vector3.Cross(faceNormal, axisA);
-
-          Vector3[] corners = { faceNormal + axisA, faceNormal - axisA, faceNormal - axisB, faceNormal + axisB, faceNormal + axisA + axisB, faceNormal - axisA + axisB, faceNormal + axisA - axisB, faceNormal - axisA - axisB };
-          Vector2[] cornerCoordinates = new Vector2[8];
-          for (int i = 0; i < corners.Length; i++)
-          {
-            corners[i] = PointOnCubeToPointOnSphere(corners[i]);
-            float longitude_rad = Mathf.Atan2(corners[i].x, -corners[i].z);
-            float latitude_rad = Mathf.Asin(corners[i].y);
-            cornerCoordinates[i] = new Vector2(longitude_rad, latitude_rad);
-          }
-
-          bool hasOneVisibleCorner = false;
-          float minX = Mathf.Infinity;
-          float minY = Mathf.Infinity;
-          float maxX = -Mathf.Infinity;
-          float maxY = -Mathf.Infinity;
-          foreach (Vector3 coord in cornerCoordinates)
-          {
-
-            // Debug.Log(faceNormal + "    " + coord);
-            if (coord.x >= minLongitude && coord.x <= maxLongitude && coord.y >= minLatitude && coord.y <= maxLatitude)
-            {
-              hasOneVisibleCorner = true;
-            }
-            if (minX > coord.x) minX = coord.x;
-            if (minY > coord.y) minY = coord.y;
-            if (maxX < coord.x) maxX = coord.x;
-            if (maxY < coord.y) maxY = coord.y;
-          }
-
-          if (faceNormal.y > 0.99f || faceNormal.y < -0.99f)
-          {
-            if (faceNormal.y > 0.99f)
-            {
-              maxY = Mathf.Infinity;
-            }
-            if (faceNormal.y < -0.99f)
-            {
-              minY = -Mathf.Infinity;
-            }
-            minX = -Mathf.Infinity;
-            maxX = Mathf.Infinity;
-          }
-
-          bool viewportHasOneCornerInside = false;
-          foreach (Vector2 coord in viewportCorners)
-          {
-            if (coord.x >= minX && coord.x <= maxX && coord.y >= minY && coord.y <= maxY)
-            {
-              viewportHasOneCornerInside = true;
-            }
-          }
-
-          // Debug.Log("Center bottom " + faceNormal + "   " + (faceNormal + axisB) + "  " + Mathf.Asin((faceNormal + axisB).y));
-          // Debug.Log("Middle left " + faceNormal + "   " + (faceNormal + axisA) + "  " + Mathf.Asin((faceNormal + axisA).y));
-
-          Debug.Log(faceNormal + "    " + hasOneVisibleCorner + "  " + viewportHasOneCornerInside + "  " + minX + "   " + minY + "   " + maxX + "   " + maxY);
-          if (hasOneVisibleCorner || viewportHasOneCornerInside)
-          {
-            meshes[meshIndex] = CreateFace(resolution, faceNormal, startT, endT, minLatitude, maxLatitude, minLongitude, maxLongitude);
-          }
-          else
-          {
-            meshes[meshIndex] = new MeshData(0, 0);
-          }
-          meshIndex++;
+          viewportHasOneCornerInside = true;
+          break;
         }
       }
     }
 
-    return meshes;
+    threshold = viewportCorners[0].HasValue && viewportCenter.HasValue ? Vector3.Dot(viewportCenter.Value, viewportCorners[0].Value.normalized) / 1.02f : Mathf.Infinity;
+    bool faceHasOneCornerInside = false || !viewportCenter.HasValue;
+    if (viewportCenter.HasValue)
+    {
+      foreach (Vector3? coord in corners)
+      {
+        if (!coord.HasValue)
+        {
+          faceHasOneCornerInside = true;
+          break;
+        }
+        else
+        {
+          // if (normal.x > 0)
+          //   Debug.Log("Is viewport corner in face " + viewportCenter.Value + "   " + coord.Value + "   " + Vector3.Dot(viewportCenter.Value, coord.Value.normalized) + "   " + viewportCorners[0].Value.normalized + "   " + threshold);
+          bool isCornerInside = Vector3.Dot(viewportCenter.Value, coord.Value.normalized) > threshold;
+          if (isCornerInside)
+          {
+            faceHasOneCornerInside = true;
+            break;
+          }
+        }
+      }
+    }
+    return faceHasOneCornerInside || viewportHasOneCornerInside;
+  }
+
+  static List<MeshData> CreateFaces(int resolution, Vector3 normal, Vector3 axisA, Vector3 axisB, int level, Vector3?[] viewportCorners, Vector3? viewportCenter)
+  {
+    if (!shouldRender(normal, axisA, axisB, viewportCorners, viewportCenter))
+    {
+      return new List<MeshData>();
+
+    }
+    if (level > 1)
+    {
+      var result = new List<MeshData>();
+
+
+      // if (normal.x > 0)
+      //   Debug.Log(normal + "    " + faceHasOneCornerInside + "  " + viewportHasOneCornerInside);
+
+      var newAxisA = axisA / 2;
+      var newAxisB = axisB / 2;
+
+      foreach (int x in new int[] { 1, -1 })
+      {
+        foreach (int y in new int[] { 1, -1 })
+        {
+          var newNormal = normal + x * newAxisA + y * newAxisB;
+          result.AddRange(CreateFaces(resolution, newNormal, newAxisA, newAxisB, level - 1, viewportCorners, viewportCenter));
+        }
+      }
+      return result;
+    }
+    else
+    {
+      return new List<MeshData> { CreateFace(resolution, normal, axisA, axisB) };
+    }
+  }
+
+
+  static MeshData CreateFace(int resolution, Vector3 normal, Vector3 axisA, Vector3 axisB)
+  {
+    // Debug.Log("Create Face" + normal + "  " + axisA + "   " + axisB);
+    int numVerts = resolution * resolution;
+    int numTris = (resolution - 1) * (resolution - 1) * 6;
+
+    int triIndex = 0;
+
+    MeshData meshData = new MeshData(numVerts, numTris);
+    float ty = 0;
+    float dx = 1.0f / (resolution - 1);
+    float dy = 1.0f / (resolution - 1);
+
+    for (int y = 0; y < resolution; y++)
+    {
+      float tx = 0;
+
+      for (int x = 0; x < resolution; x++)
+      {
+        int i = x + y * resolution;
+        Vector3 pointOnUnitCube = normal + (tx - 0.5f) * 2 * axisA + (ty - 0.5f) * 2 * axisB;
+        Vector3 pointOnUnitSphere = PointOnCubeToPointOnSphere(pointOnUnitCube);
+
+        meshData.vertices[i] = pointOnUnitSphere;
+
+        if (x != resolution - 1 && y != resolution - 1)
+        {
+          meshData.triangles[triIndex] = i;
+          meshData.triangles[triIndex + 1] = i + resolution + 1;
+          meshData.triangles[triIndex + 2] = i + resolution;
+
+          meshData.triangles[triIndex + 3] = i;
+          meshData.triangles[triIndex + 4] = i + 1;
+          meshData.triangles[triIndex + 5] = i + resolution + 1;
+          triIndex += 6;
+        }
+        tx += dx;
+      }
+      ty += dy;
+    }
+    return meshData;
   }
 
   static MeshData CreateFace(int resolution, Vector3 normal, Vector2 startT, Vector2 endT, float minLatitude, float maxLatitude, float minLongitude, float maxLongitude)

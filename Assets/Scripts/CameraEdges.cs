@@ -9,6 +9,11 @@ public class CameraEdges : MonoBehaviour
   public float minLongitude = -Mathf.Infinity;
   public float maxLongitude = Mathf.Infinity;
 
+
+  public static Vector3? topLeftIntersection;
+  public static Vector3? topRightIntersection;
+  public static Vector3? botRightIntersection;
+  public static Vector3? botLeftIntersection;
   Vector3? getIntersection(Vector3 o, Vector3 d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false)
   {
     // Debug.Log(o);
@@ -39,7 +44,7 @@ public class CameraEdges : MonoBehaviour
     float latitude_rad = Mathf.Asin(normalizedIntersection.y);
     if (log)
       Debug.Log(latitude_rad + "  " + normalizedIntersection + "   " + intersection);
-    return new Vector2(longitude_rad, latitude_rad);
+    return normalizedIntersection;
   }
 
   void getLimits()
@@ -55,49 +60,39 @@ public class CameraEdges : MonoBehaviour
 
     float radius = globeTransform.localScale.x;
 
-    // Vector2? topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius);
-    // Vector2? topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius);
-    // Vector2? botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius);
-    // Vector2? botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius);
 
-    // minLatitude = botRightIntersection.HasValue ? 1.5f * botRightIntersection.Value.y : -Mathf.Infinity;
-    // maxLatitude = topLeftIntersection.HasValue ? 1.5f * topLeftIntersection.Value.y : Mathf.Infinity;
-    // minLongitude = botLeftIntersection.HasValue ? 1.5f * botLeftIntersection.Value.x : -Mathf.Infinity;
-    // maxLongitude = topRightIntersection.HasValue ? 1.5f * topRightIntersection.Value.x : Mathf.Infinity;
+    topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.green);
+    topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius, globeTransform.worldToLocalMatrix, Color.yellow);
+    botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius, globeTransform.worldToLocalMatrix, Color.blue);
+    botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.cyan);
 
+    // minLatitude = Mathf.Min(
+    //   topLeftIntersection.HasValue ? topLeftIntersection.Value.y : -Mathf.Infinity,
+    //   topRightIntersection.HasValue ? topRightIntersection.Value.y : -Mathf.Infinity,
+    //   botRightIntersection.HasValue ? botRightIntersection.Value.y : -Mathf.Infinity,
+    //   botLeftIntersection.HasValue ? botLeftIntersection.Value.y : -Mathf.Infinity
+    // );
 
-    Vector2? topLeftIntersection = getIntersection(topLeft.origin - globeTransform.position, topLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.green);
-    Vector2? topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius, globeTransform.worldToLocalMatrix, Color.yellow);
-    Vector2? botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius, globeTransform.worldToLocalMatrix, Color.blue, true);
-    Vector2? botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.cyan);
+    // maxLatitude = Mathf.Max(
+    //   topLeftIntersection.HasValue ? topLeftIntersection.Value.y : Mathf.Infinity,
+    //   topRightIntersection.HasValue ? topRightIntersection.Value.y : Mathf.Infinity,
+    //   botRightIntersection.HasValue ? botRightIntersection.Value.y : Mathf.Infinity,
+    //   botLeftIntersection.HasValue ? botLeftIntersection.Value.y : Mathf.Infinity
+    // );
 
-    minLatitude = Mathf.Min(
-      topLeftIntersection.HasValue ? topLeftIntersection.Value.y : -Mathf.Infinity,
-      topRightIntersection.HasValue ? topRightIntersection.Value.y : -Mathf.Infinity,
-      botRightIntersection.HasValue ? botRightIntersection.Value.y : -Mathf.Infinity,
-      botLeftIntersection.HasValue ? botLeftIntersection.Value.y : -Mathf.Infinity
-    );
+    // minLongitude = Mathf.Min(
+    //   topLeftIntersection.HasValue ? topLeftIntersection.Value.x : -Mathf.Infinity,
+    //   topRightIntersection.HasValue ? topRightIntersection.Value.x : -Mathf.Infinity,
+    //   botRightIntersection.HasValue ? botRightIntersection.Value.x : -Mathf.Infinity,
+    //   botLeftIntersection.HasValue ? botLeftIntersection.Value.x : -Mathf.Infinity
+    // );
 
-    maxLatitude = Mathf.Max(
-      topLeftIntersection.HasValue ? topLeftIntersection.Value.y : Mathf.Infinity,
-      topRightIntersection.HasValue ? topRightIntersection.Value.y : Mathf.Infinity,
-      botRightIntersection.HasValue ? botRightIntersection.Value.y : Mathf.Infinity,
-      botLeftIntersection.HasValue ? botLeftIntersection.Value.y : Mathf.Infinity
-    );
-
-    minLongitude = Mathf.Min(
-      topLeftIntersection.HasValue ? topLeftIntersection.Value.x : -Mathf.Infinity,
-      topRightIntersection.HasValue ? topRightIntersection.Value.x : -Mathf.Infinity,
-      botRightIntersection.HasValue ? botRightIntersection.Value.x : -Mathf.Infinity,
-      botLeftIntersection.HasValue ? botLeftIntersection.Value.x : -Mathf.Infinity
-    );
-
-    maxLongitude = Mathf.Max(
-      topLeftIntersection.HasValue ? topLeftIntersection.Value.x : Mathf.Infinity,
-      topRightIntersection.HasValue ? topRightIntersection.Value.x : Mathf.Infinity,
-      botRightIntersection.HasValue ? botRightIntersection.Value.x : Mathf.Infinity,
-      botLeftIntersection.HasValue ? botLeftIntersection.Value.x : Mathf.Infinity
-    );
+    // maxLongitude = Mathf.Max(
+    //   topLeftIntersection.HasValue ? topLeftIntersection.Value.x : Mathf.Infinity,
+    //   topRightIntersection.HasValue ? topRightIntersection.Value.x : Mathf.Infinity,
+    //   botRightIntersection.HasValue ? botRightIntersection.Value.x : Mathf.Infinity,
+    //   botLeftIntersection.HasValue ? botLeftIntersection.Value.x : Mathf.Infinity
+    // );
   }
 
   void Start()

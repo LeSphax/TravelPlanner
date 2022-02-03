@@ -601,8 +601,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec0ba8688efca4e45b6c2e3a7e7f2009, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: 50
-  numSubdivisions: 1
+  resolution: 10
+  numSubdivisions: 5
   worldRadius: 1
   heightMultiplier: 0
   textureResolution: 3
@@ -661,4 +661,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   earthTransform: {fileID: 1565300752}
-  rotationSpeed: 300
+  rotationSpeed: 3000
