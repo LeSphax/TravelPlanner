@@ -14,6 +14,7 @@ public class CameraEdges : MonoBehaviour
   public static Vector3? topRightIntersection;
   public static Vector3? botRightIntersection;
   public static Vector3? botLeftIntersection;
+  public static Vector3? centerIntersection;
   Vector3? getIntersection(Vector3 o, Vector3 d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false)
   {
     // Debug.Log(o);
@@ -54,6 +55,7 @@ public class CameraEdges : MonoBehaviour
     Ray topRight = Camera.main.ViewportPointToRay(new Vector3(1, 1, 0));
     Ray botRight = Camera.main.ViewportPointToRay(new Vector3(1, 0, 0));
     Ray botLeft = Camera.main.ViewportPointToRay(new Vector3(0, 0, 0));
+    Ray center = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
     float radius = globeTransform.localScale.x;
 
 
@@ -61,6 +63,7 @@ public class CameraEdges : MonoBehaviour
     topRightIntersection = getIntersection(topRight.origin - globeTransform.position, topRight.direction, radius, globeTransform.worldToLocalMatrix, Color.yellow);
     botRightIntersection = getIntersection(botRight.origin - globeTransform.position, botRight.direction, radius, globeTransform.worldToLocalMatrix, Color.blue);
     botLeftIntersection = getIntersection(botLeft.origin - globeTransform.position, botLeft.direction, radius, globeTransform.worldToLocalMatrix, Color.cyan);
+    centerIntersection = getIntersection(center.origin - globeTransform.position, center.direction, radius, globeTransform.worldToLocalMatrix, Color.red);
 
     // minLatitude = Mathf.Min(
     //   topLeftIntersection.HasValue ? topLeftIntersection.Value.y : -Mathf.Infinity,
@@ -94,12 +97,14 @@ public class CameraEdges : MonoBehaviour
   void Start()
   {
     globeTransform = GameObject.FindGameObjectWithTag(Tags.WORLD).transform;
-    getLimits();
   }
 
 
   void Update()
   {
-    getLimits();
+    if (WorldGenerator.initialized)
+    {
+      getLimits();
+    }
   }
 }

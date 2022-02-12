@@ -7,6 +7,11 @@ Shader "Custom/Earth" {
 	{
         _MainTex ("Albedo", 2D) = "white" {}
         _HeightMap ("Height Map", 2D) = "white" {}
+				_bottom ("Bottom Latitude", float) = 0
+				_top ("Top Latitude", float) = 1
+				_left ("Left Longitude", float) = 0
+				_right ("Right Longitude", float) = 1
+
 	}
 	SubShader {
 		Pass {
@@ -31,6 +36,10 @@ Shader "Custom/Earth" {
 			// Data
 			sampler2D _MainTex;
 			sampler2D _HeightMap;
+			float _bottom;
+			float _top;
+			float _left;
+			float _right;
 
 			static const float PI = 3.14159;
 
@@ -63,15 +72,32 @@ Shader "Custom/Earth" {
 				float3 p = i.uv.xyz;
 				float latitude_rad = asin(p.y);
 				float longitude_rad = atan2(p.x, -p.z);
-				float latitudeT = latitude_rad / PI + 0.5;
-				float longitudeT = 0.5 + (longitude_rad / PI) / 2;
-				float2 coordinate = float2(longitudeT, latitudeT);
+				// float latitudeT = latitude_rad / PI + 0.5;
+				// float latitudeT = 1 - (log(tan(latitude_rad) + 1 / cos(latitude_rad)) / PI) / 2 + 0.5;
+				float latitudeT = (1 + log(tan(latitude_rad) + 1 / cos(latitude_rad)) / PI) / 2;
+				float adjustedLatitudeT = (latitudeT - _bottom) / (_top - _bottom);
+				// var y = ((1 - Math.log(Math.tan(latlng.lat() * Math.PI / 180) + 1 / Math.cos(latlng.lat() * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, 0)) * 256;
+
+
+				// float longitudeT = 0.5 + (longitude_rad / PI) / 2;
+				float longitudeT = ((longitude_rad + PI) / PI) / 2;
+				// if (latitudeT > 0.499f && latitudeT < 0.501f) return float4(0,0,0,0);
+				// if (longitudeT > 0.499f && longitudeT < 0.501f) return float4(0,0,0,0);
+				float adjustedLongitudeT = (longitudeT - _left) / (_right - _left);
+				// return float4(latitudeT, longitudeT, 0, 1);
+
+
+				float2 coordinate = float2(adjustedLongitudeT, adjustedLatitudeT);
 
 				// Sample textures
 				float4 albedo = tex2D(_MainTex, coordinate);
-				float4 height = tex2D(_HeightMap, coordinate);
+				// float4 height = tex2D(_HeightMap, coordinate);
 				// if (height.r > 0.8) return (0, 0, 0); 
-				return albedo * height.r;
+
+				// if ((latitude_rad * (180.0 / PI)) > 37) {
+				// 	return (1, 0, 0, 1);
+				// }
+				return albedo;
 			}
 
 			ENDCG

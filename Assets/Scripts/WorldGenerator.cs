@@ -26,6 +26,8 @@ public class WorldGenerator : MonoBehaviour
 
   [Range(0, 1)]
   public float seaLevel;
+
+  public static bool initialized = false;
   public Material material;
 
   public ComputeShader meshCompute;
@@ -35,21 +37,21 @@ public class WorldGenerator : MonoBehaviour
   private CameraEdges cameraEdges;
   public Texture2D tex;
   MeshFilter[] meshFilters;
-  private int NUMBER_OF_TILES = 32;
+  public int NUMBER_OF_TILES;
 
-  private void Awake()
+  void Awake()
   {
     cameraEdges = GetComponent<CameraEdges>();
-  }
-
-  void Start()
-  {
     Texture2D[] tiles = Resources.LoadAll<Texture2D>("SatelliteMap/Tiles_" + textureResolution);
     tiles = tiles.OrderBy(tile => Int32.Parse(tile.name.Substring(5))).ToArray();
     NUMBER_OF_TILES = (int)Mathf.Sqrt(tiles.Length);
 
     ComputeHelper.CreateRenderTexture(ref albedoMap, satelliteTileSize * NUMBER_OF_TILES, satelliteTileSize * NUMBER_OF_TILES, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Albedo Map");
-    Stitch(tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchTilesKernel);
+    Stitch(meshCompute, tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchTilesKernel);
+  }
+
+  void Start()
+  {
 
     Texture2D[] heightMapTiles = Resources.LoadAll<Texture2D>("HeightMap");
 
@@ -63,7 +65,7 @@ public class WorldGenerator : MonoBehaviour
     heightMap.wrapMode = TextureWrapMode.Clamp;
     heightMap.filterMode = FilterMode.Bilinear;
     // ComputeHelper.CreateRenderTexture(ref heightMap, heightTileSize * 4, heightTileSize * 2, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Height Map");
-    Stitch(heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
+    Stitch(meshCompute, heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
 
 
     meshFilters = new MeshFilter[6 * (int)Mathf.Pow(4, numSubdivisions)];
@@ -77,6 +79,11 @@ public class WorldGenerator : MonoBehaviour
       meshFilters[i] = meshFilter;
     }
 
+    material.SetFloat("_bottom", 0);
+    material.SetFloat("_top", 1);
+    material.SetFloat("_left", 0);
+    material.SetFloat("_right", 1);
+
     // tex = new Texture2D(tileSize * NUMBER_OF_TILES, tileSize * NUMBER_OF_TILES, TextureFormat.RGBAHalf, false);
     // RenderTexture.active = albedoMap;
     // tex.ReadPixels( new Rect(0, 0, albedoMap.width, albedoMap.height), 0, 0);
@@ -87,11 +94,11 @@ public class WorldGenerator : MonoBehaviour
     // var dirPath = Application.dataPath + "./TextureTest.png";
     // System.IO.File.WriteAllBytes(dirPath + "Image" + ".png", bytes);
     // CalculateNormalsTexture();
-
+    initialized = true;
   }
 
 
-  void Stitch(Texture2D[] tiles, ref RenderTexture map, int width, int height, int tileSize, int kernel)
+  public static void Stitch(ComputeShader meshCompute, Texture2D[] tiles, ref RenderTexture map, int width, int height, int tileSize, int kernel)
   {
     meshCompute.SetTexture(kernel, "Map", map);
 

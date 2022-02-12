@@ -76,7 +76,6 @@ void AssignVertexHeights (uint3 id : SV_DispatchThreadID)
 	UVBuffer[id.x] = p;
 }
 
-
 // // Get point on sphere from long/lat (given in radians)
 // float3 latLongToPoint(float latitude, float longitude) {
 

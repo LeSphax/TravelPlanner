@@ -12,7 +12,14 @@ public static class CubeSphere
     int meshIndex = 0;
 
     Vector3?[] viewportCorners = { CameraEdges.topLeftIntersection, CameraEdges.botLeftIntersection, CameraEdges.botRightIntersection, CameraEdges.topRightIntersection };
-    Vector3? viewportCenter = CameraEdges.topLeftIntersection.HasValue && CameraEdges.botRightIntersection.HasValue ? CameraEdges.topLeftIntersection.Value + (CameraEdges.botRightIntersection - CameraEdges.topLeftIntersection) / 2 : null;
+    Vector3? viewportCenter = CameraEdges.topLeftIntersection.HasValue && CameraEdges.botRightIntersection.HasValue ?
+    (CameraEdges.topLeftIntersection.Value + (CameraEdges.botRightIntersection.Value - CameraEdges.topLeftIntersection.Value) / 2).normalized
+    : (Vector3?)null;
+
+    // var x = (long + PI) / (2 * PI);
+    // var y = (1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / 2 * PI) * Math.pow(2, 0);
+
+
 
     foreach (Vector3 faceNormal in faceNormals)
     {
