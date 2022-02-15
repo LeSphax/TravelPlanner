@@ -81,8 +81,8 @@ public class WorldGenerator : MonoBehaviour
 
     material.SetFloat("_bottom", 0);
     material.SetFloat("_top", 1);
-    material.SetFloat("_left", 0);
-    material.SetFloat("_right", 1);
+    material.SetVector("_left", new Vector2(0, 0));
+    material.SetVector("_right", new Vector2(1, 1));
 
     // tex = new Texture2D(tileSize * NUMBER_OF_TILES, tileSize * NUMBER_OF_TILES, TextureFormat.RGBAHalf, false);
     // RenderTexture.active = albedoMap;

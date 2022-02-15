@@ -105,13 +105,13 @@ Material:
     - _UVSec: 0
     - _WaveNormalScale: 1
     - _ZWrite: 1
-    - _bottom: 0.625
+    - _bottom: 0.28125
     - _bottomLatitude: 0
-    - _left: 0.3125
+    - _left: 0
     - _leftLongitude: 0
-    - _right: 0.5625
+    - _right: 1
     - _rightLongitude: 1
-    - _top: 0.875
+    - _top: 0.53125
     - _topLatitude: 1
     m_Colors:
     - _AmbientCol: {r: 1, g: 1, b: 1, a: 1}
@@ -121,4 +121,6 @@ Material:
     - _OceanDeepCol: {r: 1, g: 1, b: 1, a: 1}
     - _OceanShallowCol: {r: 1, g: 1, b: 1, a: 1}
     - _TestParams: {r: 0, g: 0, b: 0, a: 0}
+    - _left: {r: 0.96875, g: 0, b: 0, a: 0}
+    - _right: {r: 1.21875, g: 0.25, b: 0, a: 0}
   m_BuildTextureStacks: []
