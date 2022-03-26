@@ -9,6 +9,7 @@ Shader "Custom/Earth" {
         _HeightMap ("Height Map", 2D) = "white" {}
 				_bottom ("Bottom Latitude", float) = 0
 				_top ("Top Latitude", float) = 1
+				_offset ("Offset for 2nd Longitude", float) = 0
 				_left ("Left Longitude", Vector) = (0, 0, 0, 0)
 				_right ("Right Longitude", Vector) = (1, 1, 0, 0)
 
@@ -38,6 +39,7 @@ Shader "Custom/Earth" {
 			sampler2D _HeightMap;
 			float _bottom;
 			float _top;
+			float _offset;
 			float2 _left;
 			float2 _right;
 
@@ -82,20 +84,20 @@ Shader "Custom/Earth" {
 				// float longitudeT = 0.5 + (longitude_rad / PI) / 2;
 				float longitudeT = ((longitude_rad + PI) / PI) / 2;
 				// if (latitudeT > 0.499f && latitudeT < 0.501f) return float4(0,0,0,0);
-				// if (longitudeT > 0.499f && longitudeT < 0.501f) return float4(0,0,0,0);
+				// if (longitudeT < 0.001f || longitudeT > 0.999f) return float4(0,0,0,0);
 				float adjustedLongitudeT = 0;
 				if (longitudeT >= _left.x && longitudeT <= _right.x) {
 					adjustedLongitudeT = (longitudeT - _left.x) / (_right.x - _left.x);
 				} else {
-					adjustedLongitudeT = (longitudeT - _left.y) / (_right.y - _left.y);
+					adjustedLongitudeT = _offset + (longitudeT - _left.y) / (_right.y - _left.y);
 				}
 				// float adjustedLongitudeT = (longitudeT - _left) / (_right - _left);
 				// return float4(latitudeT, longitudeT, 0, 1);
 
-
 				float2 coordinate = float2(adjustedLongitudeT, adjustedLatitudeT);
 
 				// Sample textures
+				// return float4(coordinate.x, 0, (1 - coordinate.x), 1);
 				float4 albedo = tex2D(_MainTex, coordinate);
 				// float4 height = tex2D(_HeightMap, coordinate);
 				// if (height.r > 0.8) return (0, 0, 0); 

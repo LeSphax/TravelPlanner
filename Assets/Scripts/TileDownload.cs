@@ -3,6 +3,8 @@ using UnityEngine.Networking;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using System;
+using System.Linq;
 
 public class TileDownload : MonoBehaviour
 {
@@ -13,8 +15,8 @@ public class TileDownload : MonoBehaviour
 
   public ComputeShader meshCompute;
 
-  private float previousLongitude;
-  private float previousLatitude;
+  private double previousLongitude;
+  private double previousLatitude;
   private int previousPrecision;
   private float previousRequestTime;
 
@@ -38,35 +40,59 @@ public class TileDownload : MonoBehaviour
   private WorldGenerator world;
   private RenderTexture albedoMap;
 
+  private CameraEdges cameraEdges;
+
   Dictionary<string, Texture2D> tiles = new Dictionary<string, Texture2D>();
 
   private Dictionary<int, Texture2D> defaultTexture;
 
-  Vector2 getTile(float longitude, float latitude, int precision)
+  [System.Obsolete]
+  IEnumerator DownloadImage(string hash, string MediaUrl)
   {
-    float xProportion = ((longitude + Mathf.PI) / Mathf.PI) / 2;
-    float yProportion = (1 - Mathf.Log(Mathf.Tan(latitude) + 1 / Mathf.Cos(latitude)) / Mathf.PI) / 2;
+    if (!tiles.ContainsKey(hash))
+    {
+      UnityWebRequest request = UnityWebRequestTexture.GetTexture(MediaUrl);
+      tiles[hash] = defaultTexture.ContainsKey(precision) ? defaultTexture[precision] : Texture2D.redTexture;
+      yield return request.SendWebRequest();
+      if (request.isNetworkError || request.isHttpError)
+      {
+        Debug.Log(request.error);
+        yield break;
+      }
+      else
+      {
+        networkUpdated = true;
+        tiles[hash] = ((DownloadHandlerTexture)request.downloadHandler).texture;
+      }
+    }
+  }
+
+  Vector2 getTile(double longitude, double latitude, int precision)
+  {
+    double xProportion = ((longitude + Mathd.PI) / Mathd.PI) / 2;
+    double yProportion = (1 - Mathd.Log(Mathd.Tan(latitude) + 1 / Mathd.Cos(latitude)) / Mathd.PI) / 2;
 
     // Debug.Log("Proportions " + xProportion + "   " + yProportion);
-    float tileSideAmount = Mathf.Pow(2, precision);
-    float xTile = (int)Mathf.Floor(tileSideAmount * xProportion);
-    float yTile = (int)Mathf.Floor(tileSideAmount * yProportion);
+    double tileSideAmount = Mathf.Pow(2, precision);
+    float xTile = (int)Mathd.Floor(tileSideAmount * xProportion);
+    float yTile = (int)Mathd.Floor(tileSideAmount * yProportion);
 
     return new Vector2(xTile, yTile);
   }
 
-  Vector2? getCoords(Vector3? intersection)
+  Vector2d? getCoords(Vector3d? intersection)
   {
     if (!intersection.HasValue) return null;
-    float latitude_rad = Mathf.Asin(intersection.Value.y);
-    float longitude_rad = Mathf.Atan2(intersection.Value.x, -intersection.Value.z);
-    return new Vector2(longitude_rad, latitude_rad);
+    double latitude_rad = Mathd.Asin(intersection.Value.y);
+    double longitude_rad = Mathd.Atan2(intersection.Value.x, -intersection.Value.z);
+    return new Vector2d(longitude_rad, latitude_rad);
   }
 
-  Vector2? getIndices(Vector3? intersection)
+  Vector2? getIndices(Vector3d? intersection, int precision)
   {
     if (!intersection.HasValue) return null;
-    Vector2? coords = this.getCoords(intersection);
+    Vector2d? coords = this.getCoords(intersection);
+    Debug.Log($" Coords {coords.Value.ToString("F10")} {intersection.Value.ToString()}");
     return this.getTile(coords.Value.x, coords.Value.y, precision);
   }
 
@@ -95,7 +121,7 @@ public class TileDownload : MonoBehaviour
     pinkTexture.SetPixels(fillColorArray);
     pinkTexture.Apply();
     world = GetComponent<WorldGenerator>();
-
+    cameraEdges = FindObjectOfType<CameraEdges>();
     // ComputeHelper.CreateRenderTexture(ref satelliteTexture, 2048, 2048, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Albedo Map");
     // image.texture = satelliteTexture;
   }
@@ -106,48 +132,107 @@ public class TileDownload : MonoBehaviour
     image.texture = albedoMap;
   }
 
-  [System.Obsolete]
+  struct TileRanges
+  {
+    public int precision;
+
+    public int[] minX;
+    public int minY;
+    public int[] maxX;
+    public int maxY;
+
+    public override string ToString()
+    {
+      return $"{minX[0]} {minX[1]} {maxX[0]} {maxX[1]} {minY} {maxY} {precision}";
+    }
+  }
+
+  TileRanges? GetTileRanges(int precision)
+  {
+    Vector2? botLeftIndices = getIndices(cameraEdges.botLeftIntersection, precision);
+    Vector2? botRightIndices = getIndices(cameraEdges.botRightIntersection, precision);
+    Vector2? topRightIndices = getIndices(cameraEdges.topRightIntersection, precision);
+    Vector2? topLeftIndices = getIndices(cameraEdges.topLeftIntersection, precision);
+    Vector2? topIndices = getIndices(cameraEdges.topIntersection, precision);
+    Vector2? botIndices = getIndices(cameraEdges.botIntersection, precision);
+
+    if (botLeftIndices.HasValue && botRightIndices.HasValue && topRightIndices.HasValue && topLeftIndices.HasValue && topIndices.HasValue && botIndices.HasValue)
+    {
+      // Debug.Log($"Intersections {cameraEdges.botLeftIntersection} {cameraEdges.topLeftIntersection} {cameraEdges.topRightIntersection}");
+      Debug.Log($"Indices {wrapped} {botLeftIndices.Value.x} {botRightIndices.Value.x} {topRightIndices.Value.x} {topLeftIndices.Value.x}");
+      int[] xArray = new int[] { (int)botLeftIndices.Value.x, (int)botRightIndices.Value.x, (int)topRightIndices.Value.x, (int)topLeftIndices.Value.x };
+      int[] yArray = new int[] { (int)botLeftIndices.Value.y, (int)botRightIndices.Value.y, (int)topRightIndices.Value.y, (int)topLeftIndices.Value.y, (int)topIndices.Value.y, (int)botIndices.Value.y };
+      Array.Sort(xArray);
+      Array.Sort(yArray);
+
+      TileRanges tr = new TileRanges();
+      tr.precision = precision;
+      tr.minX = new int[2];
+      tr.minY = yArray[0];
+      tr.maxY = yArray[4];
+
+      tr.maxX = new int[2];
+      int totalTiles = (int)Mathf.Pow(2, precision);
+
+      bool isAPoleVisible = cameraEdges.northPoleIsVisible || cameraEdges.southPoleIsVisible;
+
+      if (isAPoleVisible)
+      {
+        tr.minX[0] = 0;
+        tr.maxX[0] = totalTiles;
+      }
+      else
+      {
+        tr.minX[0] = xArray[0];
+        tr.maxX[0] = xArray[3];
+      }
+
+
+      wrapped = false;
+      // We wrapped around the origin
+      if (!isAPoleVisible && tr.maxX[0] - tr.minX[0] > totalTiles / 2)
+      {
+        tr.minX[1] = 0;
+        tr.maxX[1] = xArray.Where(x => x < totalTiles / 2).Last();
+        tr.minX[0] = xArray.Where(x => x > totalTiles / 2).First();
+        tr.maxX[0] = (int)totalTiles - 1;
+        wrapped = true;
+      }
+
+      // Debug.Log($"{(tr.maxX[0] - tr.minX[0])} {(tr.maxX[1] - tr.minX[1])} {(tr.maxY - tr.minY)} {world.NUMBER_OF_TILES / 2}");
+      if ((tr.maxX[0] - tr.minX[0]) >= world.NUMBER_OF_TILES / 2 || (tr.maxX[1] - tr.minX[1]) >= world.NUMBER_OF_TILES / 2 || (tr.maxY - tr.minY) >= world.NUMBER_OF_TILES / 2)
+      {
+        return GetTileRanges(precision - 1);
+      }
+      return tr;
+    }
+    else
+    {
+      return null;
+    }
+  }
+
+  [Obsolete]
   void Update()
   {
-    float totalTiles = Mathf.Pow(2, precision);
-    if (CameraEdges.topLeftIntersection.HasValue && CameraEdges.botRightIntersection.HasValue)
+    if (cameraEdges.centerIntersection.HasValue || networkUpdated)
     {
-      float distance = Vector3.Distance(CameraEdges.topLeftIntersection.Value, CameraEdges.botRightIntersection.Value);
-      // Debug.Log("Distance " + distance);
-    }
-
-    if (CameraEdges.centerIntersection.HasValue)
-    {
-      Vector2 coords = getCoords(CameraEdges.centerIntersection).Value;
-      bool somethingChanged = coords.y != previousLatitude || coords.x != previousLongitude || precision != previousPrecision || CameraEdges.botRightIntersection.HasValue != previousBotRightHasValue;
-      previousBotRightHasValue = CameraEdges.botRightIntersection.HasValue;
-      if (somethingChanged)
+      Vector2d coords = getCoords(cameraEdges.centerIntersection).Value;
+      bool somethingChanged = coords.y != previousLatitude || coords.x != previousLongitude || precision != previousPrecision || cameraEdges.botRightIntersection.HasValue != previousBotRightHasValue;
+      previousBotRightHasValue = cameraEdges.botRightIntersection.HasValue;
+      if (somethingChanged || networkUpdated)
       {
-        Vector2? botLeftIndices = getIndices(CameraEdges.botLeftIntersection);
-        Vector2? botRightIndices = getIndices(CameraEdges.botRightIntersection);
-        Vector2? topRightIndices = getIndices(CameraEdges.topRightIntersection);
-        Vector2? topLeftIndices = getIndices(CameraEdges.topLeftIntersection);
 
-        if (botLeftIndices.HasValue && botRightIndices.HasValue && topRightIndices.HasValue && topLeftIndices.HasValue)
+        TileRanges? tr = this.GetTileRanges(precision + 3);
+        // Debug.Log($"Ranges {tr.ToString()}");
+
+        if (tr.HasValue)
         {
-          minX[0] = (int)Mathf.Min(botLeftIndices.Value.x, botRightIndices.Value.x, topRightIndices.Value.x, topLeftIndices.Value.x);
-          minY = (int)Mathf.Min(botLeftIndices.Value.y, botRightIndices.Value.y, topRightIndices.Value.y, topLeftIndices.Value.y);
-          maxX[0] = (int)Mathf.Max(botLeftIndices.Value.x, botRightIndices.Value.x, topRightIndices.Value.x, topLeftIndices.Value.x);
-          maxY = (int)Mathf.Max(botLeftIndices.Value.y, botRightIndices.Value.y, topRightIndices.Value.y, topLeftIndices.Value.y);
-
-          Debug.Log($"Original {minX[0]} {maxX[0]}");
-
-          wrapped = false;
-          // We wrapped around the origin
-          if (maxX[0] - minX[0] > totalTiles / 2)
-          {
-            minX[1] = 0;
-            maxX[1] = minX[0];
-            minX[0] = maxX[0];
-            maxX[0] = (int)totalTiles - 1;
-            wrapped = true;
-          }
-
+          minX = tr.Value.minX;
+          maxX = tr.Value.maxX;
+          minY = tr.Value.minY;
+          maxY = tr.Value.maxY;
+          precision = tr.Value.precision;
 
           for (int i = 0; i < 2; i++)
           {
@@ -162,105 +247,88 @@ public class TileDownload : MonoBehaviour
             }
           }
         }
-        previousRequestTime = Time.timeSinceLevelLoad;
-        previousLatitude = coords.y;
-        previousLongitude = coords.x;
-        previousPrecision = precision;
       }
-    }
+      previousRequestTime = Time.timeSinceLevelLoad;
+      previousLatitude = coords.y;
+      previousLongitude = coords.x;
+      previousPrecision = precision;
 
-
-    if (CameraEdges.botLeftIntersection.HasValue && (minX[0] != previousMinX[0] || minX[1] != previousMinX[1] || minY != previousMinY || maxX[0] != previousMaxX[0] || maxX[1] != previousMaxX[1] || maxY != previousMaxY || networkUpdated))
-    {
-      int numberOfTiles = world.NUMBER_OF_TILES / 2;
-      Debug.Log($"{minX[0]} {maxX[0]}  {minX[1]} {maxX[1]} {minY} {maxY} {numberOfTiles}");
-      Texture2D[] tilesToDisplay = new Texture2D[numberOfTiles * numberOfTiles];
-
-
-      for (int x = minX[0]; x < minX[0] + numberOfTiles; x++)
+      if (cameraEdges.botLeftIntersection.HasValue && (minX[0] != previousMinX[0] || minX[1] != previousMinX[1] || minY != previousMinY || maxX[0] != previousMaxX[0] || maxX[1] != previousMaxX[1] || maxY != previousMaxY || networkUpdated))
       {
-        for (int y = minY; y < minY + numberOfTiles; y++)
-        {
-          string hash = $"{precision}/{x}/{y}";
-          if (tiles.ContainsKey(hash) && tiles[hash] != null)
-          {
-            tilesToDisplay[(x - minX[0]) + (y - minY) * numberOfTiles] = tiles[hash];
-          }
-        }
-      }
+        int textureTileWidth = world.NUMBER_OF_TILES / 2;
+        int textureTileHeight = world.NUMBER_OF_TILES / 2;
+        Debug.Log($"Values {minX[0]} {maxX[0]}  {minX[1]} {maxX[1]} {minY} {maxY} {textureTileWidth}");
+        Texture2D[] tilesToDisplay = new Texture2D[textureTileWidth * textureTileHeight];
 
-      if (wrapped)
-      {
-        for (int x = minX[1]; x < minX[1] + numberOfTiles; x++)
+
+        for (int x = minX[0]; x <= maxX[0]; x++)
         {
-          for (int y = minY; y < minY + numberOfTiles; y++)
+          for (int y = minY; y <= maxY; y++)
           {
             string hash = $"{precision}/{x}/{y}";
             if (tiles.ContainsKey(hash) && tiles[hash] != null)
             {
-              tilesToDisplay[(x - minX[1]) + (y - minY) * numberOfTiles] = tiles[hash];
+              // Debug.Log($"Array {x} {y} {(x - minX[0]) * textureTileHeight + (y - minY)}");
+              tilesToDisplay[(x - minX[0]) * textureTileHeight + (y - minY)] = tiles[hash];
             }
           }
         }
-      }
 
-
-      for (int y = 0; y < numberOfTiles * numberOfTiles; y++)
-      {
-        if (tilesToDisplay[y] == null)
+        if (wrapped)
         {
-          tilesToDisplay[y] = pinkTexture;
+          for (int x = minX[1]; x <= maxX[1]; x++)
+          {
+            for (int y = minY; y <= maxY; y++)
+            {
+              string hash = $"{precision}/{x}/{y}";
+              if (tiles.ContainsKey(hash) && tiles[hash] != null)
+              {
+                // Debug.Log($"Wrapped Array {(x - minX[1] + maxX[0] - minX[0]) * textureTileHeight + (y - minY)} {(y - minY)} {(x - minX[1] + maxX[0] - minX[0]) * textureTileHeight}");
+                tilesToDisplay[(x - minX[1] + maxX[0] - minX[0] + 1) * textureTileHeight + (y - minY)] = tiles[hash];
+              }
+            }
+          }
         }
-      }
 
-      WorldGenerator.Stitch(meshCompute, tilesToDisplay, ref albedoMap, 512, 0);
 
-      for (int i = 0; i < 2; i++)
-      {
-        previousMinX[i] = minX[i];
-        previousMaxX[i] = maxX[i];
+        for (int y = 0; y < textureTileWidth * textureTileHeight; y++)
+        {
+          if (tilesToDisplay[y] == null)
+          {
+            tilesToDisplay[y] = pinkTexture;
+          }
+        }
 
-      }
-      previousMinY = minY;
+        WorldGenerator.Stitch(meshCompute, tilesToDisplay, ref albedoMap, textureTileWidth, textureTileHeight, 512, 0);
 
-      previousMaxY = maxY;
-      networkUpdated = false;
+        for (int i = 0; i < 2; i++)
+        {
+          previousMinX[i] = minX[i];
+          previousMaxX[i] = maxX[i];
 
-      float bottom = (totalTiles - (minY + numberOfTiles)) / totalTiles;
-      float top = (totalTiles - minY) / totalTiles;
-      for (int i = 0; i < 2; i++)
-      {
+        }
+        previousMinY = minY;
+
+        previousMaxY = maxY;
+        networkUpdated = false;
+
+        float totalTiles = Mathf.Pow(2, precision);
+        float bottom = (totalTiles - (minY + textureTileHeight)) / totalTiles;
+        float top = (totalTiles - minY) / totalTiles;
+
         Vector2 left = new Vector2((minX[0]) / totalTiles, (minX[1]) / totalTiles);
-        Vector2 right = new Vector2((minX[0] + numberOfTiles) / totalTiles, (minX[1] + numberOfTiles) / totalTiles);
-        FindObjectOfType<WorldGenerator>().material.SetFloat("_bottom", bottom);
-        FindObjectOfType<WorldGenerator>().material.SetFloat("_top", top);
-        FindObjectOfType<WorldGenerator>().material.SetVector("_left", left);
-        FindObjectOfType<WorldGenerator>().material.SetVector("_right", right);
-      }
-    }
-  }
-
-  [System.Obsolete]
-  IEnumerator DownloadImage(string hash, string MediaUrl)
-  {
-    if (!tiles.ContainsKey(hash))
-    {
-      UnityWebRequest request = UnityWebRequestTexture.GetTexture(MediaUrl);
-      tiles[hash] = defaultTexture.ContainsKey(precision) ? defaultTexture[precision] : Texture2D.redTexture;
-      yield return request.SendWebRequest();
-      if (request.isNetworkError || request.isHttpError)
-      {
-        Debug.Log(request.error);
-        yield break;
-      }
-      else
-      {
-        networkUpdated = true;
-        tiles[hash] = ((DownloadHandlerTexture)request.downloadHandler).texture;
+        Vector2 right = new Vector2((minX[0] + textureTileWidth) / totalTiles, (minX[1] + textureTileWidth) / totalTiles);
+        float offset = (maxX[0] - minX[0] + 1) / (float)textureTileWidth;
+        world.material.SetFloat("_bottom", bottom);
+        world.material.SetFloat("_top", top);
+        world.material.SetFloat("_offset", offset);
+        world.material.SetVector("_left", left);
+        world.material.SetVector("_right", right);
       }
     }
   }
 }
+
 
 
 // https://api.maptiler.com/maps/hybrid/static/-122.4271,37.8065,15/512x512.png?key=aQbIOs34kku6WFUUdTnW

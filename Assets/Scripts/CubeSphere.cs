@@ -4,22 +4,20 @@ using System.Collections.Generic;
 public static class CubeSphere
 {
 
-  public static List<MeshData> GenerateMeshes(int resolution, int numSubdivisions, Transform transform)
+  public static List<MeshData> GenerateMeshes(int resolution, int numSubdivisions, Transform transform, CameraEdges cameraEdges)
   {
     List<MeshData> meshes = new List<MeshData>();
     Vector3[] faceNormals = { Vector3.up, Vector3.down, Vector3.left, Vector3.right, Vector3.forward, Vector3.back };
     float faceCoveragePerSubFace = 1f / numSubdivisions;
     int meshIndex = 0;
 
-    Vector3?[] viewportCorners = { CameraEdges.topLeftIntersection, CameraEdges.botLeftIntersection, CameraEdges.botRightIntersection, CameraEdges.topRightIntersection };
-    Vector3? viewportCenter = CameraEdges.topLeftIntersection.HasValue && CameraEdges.botRightIntersection.HasValue ?
-    (CameraEdges.topLeftIntersection.Value + (CameraEdges.botRightIntersection.Value - CameraEdges.topLeftIntersection.Value) / 2).normalized
+    Vector3?[] viewportCorners = { (Vector3?)cameraEdges.topLeftIntersection, (Vector3?)cameraEdges.botLeftIntersection, (Vector3?)cameraEdges.botRightIntersection, (Vector3?)cameraEdges.topRightIntersection };
+    Vector3? viewportCenter = cameraEdges.topLeftIntersection.HasValue && cameraEdges.botRightIntersection.HasValue ?
+    ((Vector3)cameraEdges.topLeftIntersection.Value + ((Vector3)cameraEdges.botRightIntersection.Value - (Vector3)cameraEdges.topLeftIntersection.Value) / 2).normalized
     : (Vector3?)null;
 
     // var x = (long + PI) / (2 * PI);
     // var y = (1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / 2 * PI) * Math.pow(2, 0);
-
-
 
     foreach (Vector3 faceNormal in faceNormals)
     {

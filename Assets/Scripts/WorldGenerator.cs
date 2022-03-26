@@ -27,7 +27,7 @@ public class WorldGenerator : MonoBehaviour
   [Range(0, 1)]
   public float seaLevel;
 
-  public static bool initialized = false;
+  public bool initialized = false;
   public Material material;
 
   public ComputeShader meshCompute;
@@ -173,7 +173,7 @@ public class WorldGenerator : MonoBehaviour
       Destroy(mesh);
     }
     frameMeshes = new List<Mesh>();
-    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions, transform);
+    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions, transform, cameraEdges);
     for (int i = 0; i < allMeshData.Count; i++)
     {
       // Debug.Log(i + "  " + allMeshData.Count);
