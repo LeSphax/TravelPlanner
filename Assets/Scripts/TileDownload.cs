@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
-using System.Collections;
 using System.Collections.Generic;
 using System;
 using System.Linq;
@@ -46,18 +45,17 @@ public class TileDownload : MonoBehaviour
 
   private Dictionary<int, Texture2D> defaultTexture;
 
-  [System.Obsolete]
-  IEnumerator DownloadImage(string hash, string MediaUrl)
+  [Obsolete]
+  async void DownloadImage(string hash, string MediaUrl)
   {
     if (!tiles.ContainsKey(hash))
     {
       UnityWebRequest request = UnityWebRequestTexture.GetTexture(MediaUrl);
       tiles[hash] = defaultTexture.ContainsKey(precision) ? defaultTexture[precision] : Texture2D.redTexture;
-      yield return request.SendWebRequest();
+      await request.SendWebRequest();
       if (request.isNetworkError || request.isHttpError)
       {
         Debug.Log(request.error);
-        yield break;
       }
       else
       {
@@ -67,33 +65,38 @@ public class TileDownload : MonoBehaviour
     }
   }
 
-  Vector2 getTile(double longitude, double latitude, int precision)
+  Vector2 getTile(double longitude, double latitude, int precision, bool log = false)
   {
     double xProportion = ((longitude + Mathd.PI) / Mathd.PI) / 2;
     double yProportion = (1 - Mathd.Log(Mathd.Tan(latitude) + 1 / Mathd.Cos(latitude)) / Mathd.PI) / 2;
+    if (log)
+      Debug.Log($"Props {xProportion} {yProportion}");
 
     // Debug.Log("Proportions " + xProportion + "   " + yProportion);
     double tileSideAmount = Mathf.Pow(2, precision);
     float xTile = (int)Mathd.Floor(tileSideAmount * xProportion);
     float yTile = (int)Mathd.Floor(tileSideAmount * yProportion);
-
+    if (log)
+      Debug.Log($"Coords {tileSideAmount * xProportion} {tileSideAmount * yProportion} {xTile} { yTile}");
     return new Vector2(xTile, yTile);
   }
 
-  Vector2d? getCoords(Vector3d? intersection)
+  Vector2d? getCoords(Vector3d? intersection, bool log = false)
   {
     if (!intersection.HasValue) return null;
     double latitude_rad = Mathd.Asin(intersection.Value.y);
     double longitude_rad = Mathd.Atan2(intersection.Value.x, -intersection.Value.z);
+    if (log)
+      Debug.Log($"Lat {latitude_rad * Mathf.Rad2Deg} {longitude_rad * Mathf.Rad2Deg}");
     return new Vector2d(longitude_rad, latitude_rad);
   }
 
-  Vector2? getIndices(Vector3d? intersection, int precision)
+  Vector2? getIndices(Vector3d? intersection, int precision, bool log = false)
   {
     if (!intersection.HasValue) return null;
-    Vector2d? coords = this.getCoords(intersection);
-    Debug.Log($" Coords {coords.Value.ToString("F10")} {intersection.Value.ToString()}");
-    return this.getTile(coords.Value.x, coords.Value.y, precision);
+    Vector2d? coords = this.getCoords(intersection, log);
+    // Debug.Log($" Coords {coords.Value.ToString()} {intersection.Value.ToString()}");
+    return this.getTile(coords.Value.x, coords.Value.y, precision, log);
   }
 
   void Awake()
@@ -159,7 +162,7 @@ public class TileDownload : MonoBehaviour
     if (botLeftIndices.HasValue && botRightIndices.HasValue && topRightIndices.HasValue && topLeftIndices.HasValue && topIndices.HasValue && botIndices.HasValue)
     {
       // Debug.Log($"Intersections {cameraEdges.botLeftIntersection} {cameraEdges.topLeftIntersection} {cameraEdges.topRightIntersection}");
-      Debug.Log($"Indices {wrapped} {botLeftIndices.Value.x} {botRightIndices.Value.x} {topRightIndices.Value.x} {topLeftIndices.Value.x}");
+      // Debug.Log($"Indices {wrapped} {botLeftIndices.Value.x} {botRightIndices.Value.x} {topRightIndices.Value.x} {topLeftIndices.Value.x}");
       int[] xArray = new int[] { (int)botLeftIndices.Value.x, (int)botRightIndices.Value.x, (int)topRightIndices.Value.x, (int)topLeftIndices.Value.x };
       int[] yArray = new int[] { (int)botLeftIndices.Value.y, (int)botRightIndices.Value.y, (int)topRightIndices.Value.y, (int)topLeftIndices.Value.y, (int)topIndices.Value.y, (int)botIndices.Value.y };
       Array.Sort(xArray);
@@ -169,7 +172,7 @@ public class TileDownload : MonoBehaviour
       tr.precision = precision;
       tr.minX = new int[2];
       tr.minY = yArray[0];
-      tr.maxY = yArray[4];
+      tr.maxY = yArray[5];
 
       tr.maxX = new int[2];
       int totalTiles = (int)Mathf.Pow(2, precision);
@@ -242,7 +245,7 @@ public class TileDownload : MonoBehaviour
               {
                 string hash = $"{precision}/{x}/{y}";
                 string url = $"https://api.maptiler.com/tiles/satellite-v2/{precision}/{x}/{y}.jpg?key=aQbIOs34kku6WFUUdTnW";
-                StartCoroutine(DownloadImage(hash, url));
+                DownloadImage(hash, url);
               }
             }
           }
@@ -257,7 +260,7 @@ public class TileDownload : MonoBehaviour
       {
         int textureTileWidth = world.NUMBER_OF_TILES / 2;
         int textureTileHeight = world.NUMBER_OF_TILES / 2;
-        Debug.Log($"Values {minX[0]} {maxX[0]}  {minX[1]} {maxX[1]} {minY} {maxY} {textureTileWidth}");
+        // Debug.Log($"Values {minX[0]} {maxX[0]}  {minX[1]} {maxX[1]} {minY} {maxY} {textureTileWidth}");
         Texture2D[] tilesToDisplay = new Texture2D[textureTileWidth * textureTileHeight];
 
 
@@ -299,7 +302,7 @@ public class TileDownload : MonoBehaviour
           }
         }
 
-        WorldGenerator.Stitch(meshCompute, tilesToDisplay, ref albedoMap, textureTileWidth, textureTileHeight, 512, 0);
+        WorldGenerator.Stitch(meshCompute, tilesToDisplay, ref albedoMap, textureTileWidth, textureTileHeight, 512, 3);
 
         for (int i = 0; i < 2; i++)
         {

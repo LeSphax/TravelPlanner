@@ -11,11 +11,12 @@ public class WorldGenerator : MonoBehaviour
   const int StitchTilesKernel = 0;
   const int StitchHeightTilesKernel = 1;
   const int CalculateMeshHeightsKernel = 2;
+  const int StitchLowResTilesKernel = 3;
   const int satelliteTileSize = 256;
   const int heightTileSize = 4096;
 
   public int resolution = 10;
-  public int numSubdivisions;
+  public int targetNumVertices;
   public float worldRadius = 100;
   public float heightMultiplier = 10;
 
@@ -47,7 +48,7 @@ public class WorldGenerator : MonoBehaviour
     NUMBER_OF_TILES = (int)Mathf.Sqrt(tiles.Length);
 
     ComputeHelper.CreateRenderTexture(ref albedoMap, satelliteTileSize * NUMBER_OF_TILES, satelliteTileSize * NUMBER_OF_TILES, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Albedo Map");
-    Stitch(meshCompute, tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchTilesKernel);
+    Stitch(meshCompute, tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchLowResTilesKernel);
   }
 
   void Start()
@@ -68,8 +69,8 @@ public class WorldGenerator : MonoBehaviour
     Stitch(meshCompute, heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
 
 
-    meshFilters = new MeshFilter[6 * (int)Mathf.Pow(4, numSubdivisions)];
-    for (int i = 0; i < 6 * Mathf.Pow(4, numSubdivisions); i++)
+    meshFilters = new MeshFilter[600];
+    for (int i = 0; i < 600; i++)
     {
       GameObject meshHolder = new GameObject("Cube Sphere Mesh" + i);
       meshHolder.transform.SetParent(transform, false);
@@ -95,8 +96,11 @@ public class WorldGenerator : MonoBehaviour
     // System.IO.File.WriteAllBytes(dirPath + "Image" + ".png", bytes);
     // CalculateNormalsTexture();
     initialized = true;
-  }
 
+    // transform.position = new Vector3(0, 0, 1599.5416259765625f);
+    // transform.rotation = new Quaternion(-0.3708638548851013f, 0.013468591496348381f, -0.025232665240764619f, 0.9282467365264893f);
+    // transform.localScale = Vector3.one * 1594.5416259765625f;
+  }
 
   public static void Stitch(ComputeShader meshCompute, Texture2D[] tiles, ref RenderTexture map, int width, int height, int tileSize, int kernel)
   {
@@ -104,10 +108,15 @@ public class WorldGenerator : MonoBehaviour
 
     for (int i = 0; i < tiles.Length; i++)
     {
-      meshCompute.SetTexture(kernel, kernel == StitchTilesKernel ? "Tile" : "HeightTile", tiles[i]);
+      meshCompute.SetTexture(kernel, kernel == StitchHeightTilesKernel ? "HeightTile" : "Tile", tiles[i]);
       meshCompute.SetInt("offsetX", (i / height) * tileSize);
       meshCompute.SetInt("offsetY", ((height - 1) - (i % height)) * tileSize);
-      ComputeHelper.Dispatch(meshCompute, tileSize, tileSize, 1, kernel);
+      ComputeHelper.Dispatch(
+        meshCompute,
+      kernel == StitchLowResTilesKernel ? tileSize / 2 : tileSize,
+      kernel == StitchLowResTilesKernel ? tileSize / 2 : tileSize,
+      kernel == StitchLowResTilesKernel ? 4 : 1,
+      kernel);
     }
   }
 
@@ -173,10 +182,10 @@ public class WorldGenerator : MonoBehaviour
       Destroy(mesh);
     }
     frameMeshes = new List<Mesh>();
-    var allMeshData = CubeSphere.GenerateMeshes(resolution, numSubdivisions, transform, cameraEdges);
+    var allMeshData = CubeSphere.GenerateMeshes(resolution, transform, cameraEdges, targetNumVertices);
     for (int i = 0; i < allMeshData.Count; i++)
     {
-      // Debug.Log(i + "  " + allMeshData.Count);
+      // Debug.Log(allMeshData[i].vertices.Length);
       frameMeshes.Add(Create(allMeshData[i].vertices, allMeshData[i].triangles, i));
     }
     material.SetTexture("_MainTex", albedoMap);

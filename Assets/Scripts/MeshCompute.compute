@@ -1,6 +1,8 @@
 #pragma kernel StitchTiles
 #pragma kernel StitchHeightTiles
 #pragma kernel AssignVertexHeights
+#pragma kernel StitchLowResTiles
+
 
 
 // Heightmap contains height value in alpha channel, and normals in rgb channels
@@ -13,6 +15,12 @@ uint offsetY;
 void StitchTiles (uint3 id : SV_DispatchThreadID)
 {
 	Map[id.xy + uint2(offsetX, offsetY)] = float4(Tile[id.xy].xyz, 0);
+}
+
+[numthreads(8,8,4)]
+void StitchLowResTiles (uint3 id : SV_DispatchThreadID)
+{
+	Map[uint2(id.x * 2 + (id.z % 2), id.y * 2 + (id.z >> 1)) + uint2(offsetX, offsetY)] = float4(Tile[id.xy].xyz, 0);
 }
 
 Texture2D<float4> HeightTile;

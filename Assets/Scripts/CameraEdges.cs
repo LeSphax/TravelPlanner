@@ -21,7 +21,7 @@ public class CameraEdges : MonoBehaviour
 
   public bool southPoleIsVisible = false;
   public bool northPoleIsVisible = false;
-  Vector3d? getIntersection(Vector3d o, Vector3d d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false)
+  Vector3d? getIntersection(Vector3d o, Vector3d d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false, bool draw = true)
   {
     // Equation for the sphere X*X + Y*Y + Z*Z = R*R
     // Equations for the line (X,Y,Z) = o + T * d
@@ -41,9 +41,14 @@ public class CameraEdges : MonoBehaviour
     double T2 = (-b + deltaRoot) / 2 * a;
 
     Vector3d intersection = o + T * d;
+
+    // TODO: Create a double Quaternion.Inverse function for more precision.
     Vector3d normalizedIntersection = new Vector3d(Quaternion.Inverse(globeTransform.localRotation) * (Vector3)intersection.normalized);
-    Debug.DrawLine(globeTransform.position, globeTransform.position + (Vector3)intersection, color, 0.1f);
-    Debug.DrawLine((Vector3)o, globeTransform.position + (Vector3)intersection, color, 0.1f);
+    if (draw)
+    {
+      Debug.DrawLine(globeTransform.position, globeTransform.position + (Vector3)intersection.normalized * 100, color, 0.1f);
+      // Debug.DrawLine((Vector3)o, globeTransform.position + (Vector3)intersection, color, 0.1f);
+    }
     // Debug.DrawLine(globeTransform.position, globeTransform.position + normalizedIntersection * 10, color, 0.1f);
     double longitude_rad = Mathd.Atan2(normalizedIntersection.x, -normalizedIntersection.z);
     double latitude_rad = Mathd.Asin(normalizedIntersection.y);
@@ -63,10 +68,10 @@ public class CameraEdges : MonoBehaviour
     Ray center = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
     float radius = globeTransform.localScale.x;
 
-    topIntersection = getIntersection(new Vector3d(top.origin - globeTransform.position), new Vector3d(top.direction), radius, globeTransform.worldToLocalMatrix, Color.green);
+    topIntersection = getIntersection(new Vector3d(top.origin - globeTransform.position), new Vector3d(top.direction), radius, globeTransform.worldToLocalMatrix, Color.green, false, false);
     topLeftIntersection = getIntersection(new Vector3d(topLeft.origin - globeTransform.position), new Vector3d(topLeft.direction), radius, globeTransform.worldToLocalMatrix, Color.green);
     topRightIntersection = getIntersection(new Vector3d(topRight.origin - globeTransform.position), new Vector3d(topRight.direction), radius, globeTransform.worldToLocalMatrix, Color.yellow);
-    botIntersection = getIntersection(new Vector3d(bot.origin - globeTransform.position), new Vector3d(bot.direction), radius, globeTransform.worldToLocalMatrix, Color.blue);
+    botIntersection = getIntersection(new Vector3d(bot.origin - globeTransform.position), new Vector3d(bot.direction), radius, globeTransform.worldToLocalMatrix, Color.blue, false, false);
     botRightIntersection = getIntersection(new Vector3d(botRight.origin - globeTransform.position), new Vector3d(botRight.direction), radius, globeTransform.worldToLocalMatrix, Color.blue);
     botLeftIntersection = getIntersection(new Vector3d(botLeft.origin - globeTransform.position), new Vector3d(botLeft.direction), radius, globeTransform.worldToLocalMatrix, Color.cyan);
     centerIntersection = getIntersection(new Vector3d(center.origin - globeTransform.position), new Vector3d(center.direction), radius, globeTransform.worldToLocalMatrix, Color.grey);
@@ -163,37 +168,8 @@ public class CameraEdges : MonoBehaviour
       getLimits();
       southPoleIsVisible = isPoleVisible(Vector3.down);
       northPoleIsVisible = isPoleVisible(Vector3.up);
+      // if (botLeftIntersection.HasValue)
+      //   Debug.Log($"{botLeftIntersection} {Mathd.Atan2(botLeftIntersection.Value.x, -botLeftIntersection.Value.z) * Mathf.Rad2Deg} {Mathd.Asin(botLeftIntersection.Value.y) * Mathf.Rad2Deg}");
     }
-
-    // float x = 1.05f;
-    // for (int i = 0; i < 10; i++)
-    // {
-    //   x = x * x;
-    // }
-    // Debug.Log("X  " + x.ToString("F40"));
-
-    // double y = 1.05d;
-    // for (int i = 0; i < 5; i++)
-    // {
-    //   y = y * y;
-    // }
-    // for (int i = 0; i < 5; i++)
-    // {
-    //   y = y * y;
-    // }
-    // Debug.Log("Y  " + y.ToString("F40"));
-
-    // double z = 1.05d;
-    // for (int i = 0; i < 5; i++)
-    // {
-    //   z = z * z;
-    // }
-    // float zz = (float)z;
-    // z = (double)zz;
-    // for (int i = 0; i < 5; i++)
-    // {
-    //   z = z * z;
-    // }
-    // Debug.Log("Z  " + z.ToString("F40"));
   }
 }

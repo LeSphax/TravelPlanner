@@ -604,11 +604,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   resolution: 10
-  numSubdivisions: 2
+  targetNumVertices: 10000
   worldRadius: 1
   heightMultiplier: 0
   textureResolution: 4
   seaLevel: 0
+  initialized: 0
   material: {fileID: 2100000, guid: 417f20afd8c49754499bc5f508a6a1a2, type: 2}
   meshCompute: {fileID: 7200000, guid: 23510876aee2cc54e85833067f9fc80c, type: 3}
   albedoMap: {fileID: 0}
@@ -645,6 +646,8 @@ MonoBehaviour:
   maxLatitude: Infinity
   minLongitude: -Infinity
   maxLongitude: Infinity
+  southPoleIsVisible: 0
+  northPoleIsVisible: 0
 --- !u!114 &1565300754
 MonoBehaviour:
   m_ObjectHideFlags: 0
