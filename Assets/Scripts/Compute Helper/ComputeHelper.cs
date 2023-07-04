@@ -24,8 +24,6 @@ public static class ComputeHelper
     int numGroupsX = Mathf.CeilToInt(numIterationsX / (float)threadGroupSizes.x);
     int numGroupsY = Mathf.CeilToInt(numIterationsY / (float)threadGroupSizes.y);
     int numGroupsZ = Mathf.CeilToInt(numIterationsZ / (float)threadGroupSizes.z);
-    Debug.Log($"{kernelIndex} {numIterationsX} {numIterationsY} {numIterationsZ}");
-    Debug.Log($"{numGroupsX} {numGroupsY} {numGroupsZ}");
     cs.Dispatch(kernelIndex, numGroupsX, numGroupsY, numGroupsZ);
   }
 

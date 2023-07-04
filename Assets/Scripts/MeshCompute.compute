@@ -17,10 +17,15 @@ void StitchTiles (uint3 id : SV_DispatchThreadID)
 	Map[id.xy + uint2(offsetX, offsetY)] = float4(Tile[id.xy].xyz, 0);
 }
 
+uint sideSplitCount;
+uint textureOffsetX;
+uint textureOffsetY;
+uint logSideSplitCount;
+
 [numthreads(8,8,4)]
 void StitchLowResTiles (uint3 id : SV_DispatchThreadID)
 {
-	Map[uint2(id.x * 2 + (id.z % 2), id.y * 2 + (id.z >> 1)) + uint2(offsetX, offsetY)] = float4(Tile[id.xy].xyz, 0);
+	Map[uint2(id.x * sideSplitCount + (id.z % sideSplitCount), id.y * sideSplitCount + (id.z >> logSideSplitCount)) + uint2(offsetX, offsetY)] = float4(Tile[id.xy + uint2(textureOffsetX, textureOffsetY)].xyz, 0);
 }
 
 Texture2D<float4> HeightTile;

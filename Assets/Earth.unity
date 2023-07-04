@@ -603,11 +603,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec0ba8688efca4e45b6c2e3a7e7f2009, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  resolution: 10
-  targetNumVertices: 10000
+  resolution: 50
+  targetNumVertices: 100
   worldRadius: 1
   heightMultiplier: 0
-  textureResolution: 4
+  textureResolution: 5
   seaLevel: 0
   initialized: 0
   material: {fileID: 2100000, guid: 417f20afd8c49754499bc5f508a6a1a2, type: 2}

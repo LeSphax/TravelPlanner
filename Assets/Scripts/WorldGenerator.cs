@@ -1,9 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Experimental.Rendering;
 using System.Collections.Generic;
-using System;
-using System.Linq;
 
 public class WorldGenerator : MonoBehaviour
 {
@@ -12,7 +9,7 @@ public class WorldGenerator : MonoBehaviour
   const int StitchHeightTilesKernel = 1;
   const int CalculateMeshHeightsKernel = 2;
   const int StitchLowResTilesKernel = 3;
-  const int satelliteTileSize = 256;
+  const int satelliteTileSize = 512;
   const int heightTileSize = 4096;
 
   public int resolution = 10;
@@ -36,40 +33,39 @@ public class WorldGenerator : MonoBehaviour
   public RenderTexture albedoMap;
   public RenderTexture heightMap;
   private CameraEdges cameraEdges;
-  public Texture2D tex;
   MeshFilter[] meshFilters;
   public int NUMBER_OF_TILES;
 
   void Awake()
   {
     cameraEdges = GetComponent<CameraEdges>();
-    Texture2D[] tiles = Resources.LoadAll<Texture2D>("SatelliteMap/Tiles_" + textureResolution);
-    tiles = tiles.OrderBy(tile => Int32.Parse(tile.name.Substring(5))).ToArray();
-    NUMBER_OF_TILES = (int)Mathf.Sqrt(tiles.Length);
+    // Texture2D[] tiles = Resources.LoadAll<Texture2D>("SatelliteMap/Tiles_" + textureResolution);
+    // tiles = tiles.OrderBy(tile => Int32.Parse(tile.name.Substring(5))).ToArray();
+    NUMBER_OF_TILES = (int)Mathf.Pow(2, textureResolution);
 
     ComputeHelper.CreateRenderTexture(ref albedoMap, satelliteTileSize * NUMBER_OF_TILES, satelliteTileSize * NUMBER_OF_TILES, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Albedo Map");
-    Stitch(meshCompute, tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchLowResTilesKernel);
+    // Stitch(meshCompute, tiles, ref albedoMap, NUMBER_OF_TILES, NUMBER_OF_TILES, satelliteTileSize, StitchTilesKernel);
   }
 
   void Start()
   {
 
-    Texture2D[] heightMapTiles = Resources.LoadAll<Texture2D>("HeightMap");
+        Texture2D[] heightMapTiles = Resources.LoadAll<Texture2D>("HeightMap");
 
-    heightMap = new RenderTexture(heightTileSize * 4, heightTileSize * 2, 0);
-    heightMap.graphicsFormat = GraphicsFormat.R8G8B8A8_SNorm;
-    heightMap.enableRandomWrite = true;
+        heightMap = new RenderTexture(heightTileSize * 4, heightTileSize * 2, 0);
+        heightMap.graphicsFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8B8A8_SNorm;
+        heightMap.enableRandomWrite = true;
 
-    heightMap.autoGenerateMips = false;
-    heightMap.Create();
-    heightMap.name = name;
-    heightMap.wrapMode = TextureWrapMode.Clamp;
-    heightMap.filterMode = FilterMode.Bilinear;
-    // ComputeHelper.CreateRenderTexture(ref heightMap, heightTileSize * 4, heightTileSize * 2, FilterMode.Bilinear, RenderTextureFormat.ARGBHalf, "Height Map");
-    Stitch(meshCompute, heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
+        heightMap.autoGenerateMips = false;
+        heightMap.Create();
+        heightMap.name = name;
+        heightMap.wrapMode = TextureWrapMode.Clamp;
+        heightMap.filterMode = FilterMode.Bilinear;
+
+        Stitch(meshCompute, heightMapTiles, ref heightMap, 4, 2, heightTileSize, StitchHeightTilesKernel);
 
 
-    meshFilters = new MeshFilter[600];
+        meshFilters = new MeshFilter[600];
     for (int i = 0; i < 600; i++)
     {
       GameObject meshHolder = new GameObject("Cube Sphere Mesh" + i);
@@ -85,24 +81,13 @@ public class WorldGenerator : MonoBehaviour
     material.SetVector("_left", new Vector2(0, 0));
     material.SetVector("_right", new Vector2(1, 1));
 
-    // tex = new Texture2D(tileSize * NUMBER_OF_TILES, tileSize * NUMBER_OF_TILES, TextureFormat.RGBAHalf, false);
-    // RenderTexture.active = albedoMap;
-    // tex.ReadPixels( new Rect(0, 0, albedoMap.width, albedoMap.height), 0, 0);
-    // tex.Apply();
-    // RenderTexture.active = null;
-
-    // byte[] bytes = tex.EncodeToPNG();
-    // var dirPath = Application.dataPath + "./TextureTest.png";
-    // System.IO.File.WriteAllBytes(dirPath + "Image" + ".png", bytes);
-    // CalculateNormalsTexture();
     initialized = true;
-
-    // transform.position = new Vector3(0, 0, 1599.5416259765625f);
-    // transform.rotation = new Quaternion(-0.3708638548851013f, 0.013468591496348381f, -0.025232665240764619f, 0.9282467365264893f);
-    // transform.localScale = Vector3.one * 1594.5416259765625f;
+    //transform.position = new Vector3(0, 0, 63631.3125f);
+    //transform.rotation = new Quaternion(-0.30855026841163638f, -0.038197193294763568f, -0.004406340420246124f, 0.9504305720329285f);
+    //transform.localScale = Vector3.one * 63626.31f;
   }
 
-  public static void Stitch(ComputeShader meshCompute, Texture2D[] tiles, ref RenderTexture map, int width, int height, int tileSize, int kernel)
+  static void Stitch(ComputeShader meshCompute, Texture2D[] tiles, ref RenderTexture map, int width, int height, int tileSize, int kernel)
   {
     meshCompute.SetTexture(kernel, "Map", map);
 
@@ -111,12 +96,29 @@ public class WorldGenerator : MonoBehaviour
       meshCompute.SetTexture(kernel, kernel == StitchHeightTilesKernel ? "HeightTile" : "Tile", tiles[i]);
       meshCompute.SetInt("offsetX", (i / height) * tileSize);
       meshCompute.SetInt("offsetY", ((height - 1) - (i % height)) * tileSize);
-      ComputeHelper.Dispatch(
-        meshCompute,
-      kernel == StitchLowResTilesKernel ? tileSize / 2 : tileSize,
-      kernel == StitchLowResTilesKernel ? tileSize / 2 : tileSize,
-      kernel == StitchLowResTilesKernel ? 4 : 1,
-      kernel);
+      ComputeHelper.Dispatch(meshCompute, tileSize, tileSize, 1, kernel);
+    }
+  }
+
+  public static void Stitch(ComputeShader meshCompute, (Texture2D tile, TilePart part)[] tiles, ref RenderTexture map, int width, int height, int tileSize)
+  {
+    Debug.Log("Stitch");
+    meshCompute.SetTexture(StitchLowResTilesKernel, "Map", map);
+
+    for (int i = 0; i < tiles.Length; i++)
+    {
+      meshCompute.SetTexture(StitchLowResTilesKernel, "Tile", tiles[i].tile);
+      meshCompute.SetInt("offsetX", (i / height) * tileSize);
+      meshCompute.SetInt("offsetY", ((height - 1) - (i % height)) * tileSize);
+      var splitCount = tiles[i].part.sideSplitCount;
+      var partSize = tileSize / splitCount;
+      meshCompute.SetInt("sideSplitCount", splitCount);
+      meshCompute.SetInt("logSideSplitCount", (int)Mathf.Log(splitCount, 2));
+      meshCompute.SetInt("textureOffsetX", partSize * tiles[i].part.x);
+      meshCompute.SetInt("textureOffsetY", partSize * tiles[i].part.y);
+      if (splitCount == 8)
+        Debug.Log($"{splitCount} {partSize} {52 % splitCount} {52 >> (splitCount / 2)}");
+      ComputeHelper.Dispatch(meshCompute, partSize, partSize, splitCount * splitCount, StitchLowResTilesKernel);
     }
   }
 
@@ -167,12 +169,6 @@ public class WorldGenerator : MonoBehaviour
     return mesh;
   }
 
-  // void CalculateNormalsTexture()
-  // {
-  // 	meshCompute.SetTexture(CalculateNormalsKernel, "HeightMap", heightMap);
-  // 	ComputeHelper.Dispatch(meshCompute, heightMap.width, heightMap.height, 1, CalculateNormalsKernel);
-  // }
-
 
   List<Mesh> frameMeshes = new List<Mesh>();
   void Update()
@@ -190,29 +186,5 @@ public class WorldGenerator : MonoBehaviour
     }
     material.SetTexture("_MainTex", albedoMap);
     material.SetTexture("_HeightMap", heightMap);
-    // material.SetFloat("_SeaLevel", seaLevel);
-    // material.SetVector("fillLightDir", fillLight.transform.forward);
-    // material.SetColor("fillLightCol", new Color(fillLight.color.r, fillLight.color.g, fillLight.color.b, fillLight.intensity));
-    // material.SetVector("fillLightDir2", fillLight2.transform.forward);
-    // material.SetColor("fillLightCol2", new Color(fillLight2.color.r, fillLight2.color.g, fillLight2.color.b, fillLight2.intensity));
   }
-
-  // public (float height, bool inOcean, int countryIndex) GetTerrainInfo(Coordinate coordinate)
-  // {
-  // 	//meshCompute.SetVector("probePos", pos.normalized);
-  // 	ComputeBuffer heightRequestBuffer = new ComputeBuffer(1, sizeof(float) * 3);
-  // 	meshCompute.SetVector("heightRequestCoord", coordinate.ToVector2());
-  // 	meshCompute.SetBuffer(HeightRequestKernel, "HeightRequestBuffer", heightRequestBuffer);
-  // 	meshCompute.SetTexture(HeightRequestKernel, "HeightMap", heightMap);
-  // 	ComputeHelper.Dispatch(meshCompute, 1, 1, 1, HeightRequestKernel);
-
-  // 	Vector3[] result = new Vector3[1];
-  // 	heightRequestBuffer.GetData(result);
-  // 	heightRequestBuffer.Release();
-
-  // 	return (result[0].x, (int)result[0].y == 1, (int)result[0].z);
-
-  // }
-
-
 }

@@ -21,6 +21,14 @@ public class CameraEdges : MonoBehaviour
 
   public bool southPoleIsVisible = false;
   public bool northPoleIsVisible = false;
+  (double w, double x, double y, double z) QuaternionMult(double w, double x, double y, double z, double w2, double x2, double y2, double z2)
+  {
+    return (w2 * w - x2 * x - y2 * y - z2 * z,
+            w2 * x + x2 * w - y2 * z + z2 * y,
+            w2 * y + x2 * z + y2 * w - z2 * x,
+            w2 * z - x2 * y + y2 * x + z2 * w);
+  }
+
   Vector3d? getIntersection(Vector3d o, Vector3d d, float r, Matrix4x4 globeWorldToLocal, Color color, bool log = false, bool draw = true)
   {
     // Equation for the sphere X*X + Y*Y + Z*Z = R*R
@@ -41,9 +49,16 @@ public class CameraEdges : MonoBehaviour
     double T2 = (-b + deltaRoot) / 2 * a;
 
     Vector3d intersection = o + T * d;
+    Vector3d i = intersection.normalized;
 
     // TODO: Create a double Quaternion.Inverse function for more precision.
-    Vector3d normalizedIntersection = new Vector3d(Quaternion.Inverse(globeTransform.localRotation) * (Vector3)intersection.normalized);
+    Quaternion inverseRotation = Quaternion.Inverse(globeTransform.localRotation);
+    Quaternion conjugate = new Quaternion(-inverseRotation.x, -inverseRotation.y, -inverseRotation.z, inverseRotation.w);
+    var mult1 = QuaternionMult(inverseRotation.w, inverseRotation.x, inverseRotation.y, inverseRotation.z, 0, i.x, i.y, i.z);
+    var mult2 = QuaternionMult(mult1.w, mult1.x, mult1.y, mult1.z, conjugate.w, conjugate.x, conjugate.y, conjugate.z);
+    Vector3d normalizedIntersection = new Vector3d(mult2.x, mult2.y, mult2.z);
+    Vector3d normalizedIntersection2 = new Vector3d(Quaternion.Inverse(globeTransform.localRotation) * (Vector3)intersection.normalized);
+
     if (draw)
     {
       Debug.DrawLine(globeTransform.position, globeTransform.position + (Vector3)intersection.normalized * 100, color, 0.1f);
@@ -110,31 +125,30 @@ public class CameraEdges : MonoBehaviour
   bool isPoleVisible(Vector3 poleDirection)
   {
     float r = globeTransform.localScale.x;
-    Vector3 polePosition = (Vector3)(globeTransform.localToWorldMatrix * poleDirection);
-    Ray cameraToPole = new Ray(Camera.main.transform.position, polePosition);
-    Vector3 cameraPosition = Camera.main.transform.position - globeTransform.position;
+    Vector3d polePosition = new Vector3d(globeTransform.localToWorldMatrix * poleDirection);
+    Vector3d cameraPosition = new Vector3d(Camera.main.transform.position - globeTransform.position);
 
-    Vector3 o = cameraPosition;
-    Vector3 d = (polePosition - cameraPosition).normalized;
+    Vector3d o = cameraPosition;
+    Vector3d d = (polePosition - cameraPosition).normalized;
 
-    float a = d.x * d.x + d.y * d.y + d.z * d.z;
-    float b = 2 * (o.x * d.x + o.y * d.y + o.z * d.z);
-    float c = o.x * o.x + o.y * o.y + o.z * o.z - r * r;
+    double a = d.x * d.x + d.y * d.y + d.z * d.z;
+    double b = 2 * (o.x * d.x + o.y * d.y + o.z * d.z);
+    double c = o.x * o.x + o.y * o.y + o.z * o.z - r * r;
 
     // Discriminant of the quadratic equation
-    float delta = b * b - 4 * a * c;
+    double delta = b * b - 4 * a * c;
 
     if (delta > 0)
     {
-      float deltaRoot = Mathf.Sqrt(delta);
+      double deltaRoot = Mathd.Sqrt(delta);
       // We only care about the closest point and deltaRoot is positive so we take the smaller T 
-      float T = (-b - deltaRoot) / 2 * a;
-      float T2 = (-b + deltaRoot) / 2 * a;
+      double T = (-b - deltaRoot) / 2 * a;
+      double T2 = (-b + deltaRoot) / 2 * a;
 
-      Vector3 intersection = o + T * d;
-      Vector3 intersection2 = o + T2 * d;
-
-      if (Vector3.Distance(intersection, polePosition) < 0.0001f)
+      Vector3d intersection = o + T * d;
+      Vector3d intersection2 = o + T2 * d;
+      // Debug.Log($"Intersection {polePosition} {Vector3d.Distance(intersection, polePosition)} {Vector3d.Distance(intersection, polePosition)}");
+      if (Vector3d.Distance(intersection, polePosition) < 0.0001f)
       {
         return true;
         // Debug.Log($"Pole is visible ! {Vector3.Distance(intersection, polePosition)} {Vector3.Distance(intersection2, polePosition)}");

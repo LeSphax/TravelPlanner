@@ -68,10 +68,10 @@ public static class CubeSphere
   {
     SRCallCount += 1;
     Vector3d[] corners = {
-      PointOnCubeToPointOnSphere(normal + axisA * 1.1 + axisB * 1.1),
-      PointOnCubeToPointOnSphere(normal - axisA * 1.1 + axisB * 1.1),
-      PointOnCubeToPointOnSphere(normal + axisA * 1.1 - axisB * 1.1),
-      PointOnCubeToPointOnSphere(normal - axisA * 1.1 - axisB * 1.1)
+      PointOnCubeToPointOnSphere(normal + axisA * 1.3 + axisB * 1.3),
+      PointOnCubeToPointOnSphere(normal - axisA * 1.3 + axisB * 1.3),
+      PointOnCubeToPointOnSphere(normal + axisA * 1.3 - axisB * 1.3),
+      PointOnCubeToPointOnSphere(normal - axisA * 1.3 - axisB * 1.3)
     };
     Vector3d sphereNormal = PointOnCubeToPointOnSphere(normal);
     // Dot product of normalized vectors is higher when they are more aligned.
